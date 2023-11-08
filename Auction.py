@@ -4,72 +4,62 @@ from utils import utils
 @sp.module
 def main():
     class Auction(sp.Contract):
-        def __init__ (self):
-            self.data.bidders = {None : None}
-            self.data.top = sp.record(winning = [],amount = sp.mutez(0))
-            self.data.amount = sp.mutez(0)
-            self.data.minBid = sp.mutez(0)
-    
+        def __init__ (self, startingBid, time, admin):
+            self.data.admin = admin
+            self.data.top = sp.record(address = None ,amount = sp.mutez(0))
+            self.data.startBid = startingBid
+            self.data.duration = time
+            self.data.isStart = False
+            
+        
+        @sp.entry_point
+        def start(self):
+           #check if the caller is the admin
+            assert sp.sender == self.data.admin, "You are not the admin"
+            
+            #start the auction
+            self.data.isStart = True 
         
         @sp.entry_point
         def bid(self):
-            #check if a bidder has already partecipated
-            assert self.data.bidders.contains(sp.Some(sp.sender)) == False, "This address is already registered"
+            #check if the Auction is started
+            assert self.data.isStart == True, "The auction is not started yet"
             
-            #add to bidder
-            self.data.bidders[sp.Some(sp.sender)] = sp.Some(sp.amount)
-    
-            #check if is top bid
-            if sp.amount >= self.data.top.amount:
-                if sp.amount > self.data.top.amount:
-                    self.data.top = sp.record(winning = [sp.sender], amount = sp.amount)
-                else:
-                    newList = sp.cons(sp.sender, self.data.top.winning)
-                    self.data.top = sp.record(winning = newList, amount = sp.amount)
+            #check if the bid is grater then the current one
+            assert sp.amount > self.data.top.amount, "The bid has to be greater"
             
+            if not self.data.top.address == None: #refund
+                sp.send(self.data.top.address.unwrap_some(), self.data.top.amount)
+                
+            self.data.top.address = sp.Some(sp.sender)
+            self.data.top.amount = sp.amount
+            
+
         @sp.entry_point
-        def getWinner(self):
-            #check how many winners
-            listTemp = self.data.top.winning
-            #remove temporarily winners from map
-            for i in listTemp:
-                    adTemp = listTemp
-                    listTemp = listTemp.tail
-                    #delete winner from map
-                    del self.data.bidders[adTemp]
+        def end(self, time):
+            #check if the caller is the admin
+            assert sp.sender == self.data.admin, "You are not the admin"
+
+            #check if deadline is reached
+            assert time >= self.data.duration, "Deadline is not reached"
             
-            #rimborso 
-            addressList = self.data.bidders.keys()
-            for i in addressList:
-                    address = addressList.head
-                    addressList.value = addressList.tail
-                    sp.send(address, self.data.bidders[address])
-                    del self.data.bidders[address]
-                    
-            #re-list
-            listTemp.value = self.data.top.winning
-            for j in listTemp:
-                    address = listTemp.head
-                    listTemp.value = listTemp.tail
-                    self.data.bidders[address] = self.data.top.amount
-    
-            #case: more then 1 winners
-            if sp.len(self.data.bidders) > 1:
-                self.data.minBid = self.data.top.amount
-                self.data.top = sp.record(winning = [], amount = sp.mutez(0))
-                adList = self.data.bidders.keys()
-                for k in adList.value:
-                        address = listTemp.head
-                        adList.value = listTemp.tail
-                        sp.send(address, self.data.minBid)
+            #withdraw all the assets
+            sp.send(self.data.admin, sp.balance)
+            
+                      
+        
 
 
 @sp.add_test(name = "auctionTest")
 def auctionTest():
     #set scenario
     sc = sp.test_scenario(main)
+    #create admin
+    admin = sp.test_account("admin")
+    #create time 
+    time = sp.timestamp_from_utc_now() #calculate execution time
     #new object Auction
-    auction = main.Auction()
+    auction = main.Auction(sp.mutez(5), time, admin.address)
     #start scenario
     sc += auction
 
@@ -77,21 +67,24 @@ def auctionTest():
     sofia = sp.test_account("sofia")
     piero = sp.test_account("piero")
     carla = sp.test_account("carla")
-    maria = sp.test_account("maria")
 
+    #start auction
+    sc.h1("Start Auction")
+    auction.start().run(sender = admin)
     #first bid
     sc.h1("First Bid")
     auction.bid().run(sender = sofia, amount = sp.mutez(100))
-    auction.bid().run(sender = sofia, amount = sp.mutez(100)).run(valid = False)
+    auction.bid().run(sender = sofia, amount = sp.mutez(100),valid = False)
     #second bid
     sc.h1("Second Bid")
-    auction.bid().run(sender = piero, amount = sp.mutez(10))
+    auction.bid().run(sender = piero, amount = sp.mutez(10), valid = False)
+    auction.bid().run(sender = piero, amount = sp.mutez(101))
     #third bid
     sc.h1("Third Bid")
     auction.bid().run(sender = carla, amount = sp.mutez(1000))
-    sc.h1("Fourth Bid")
-    auction.bid().run(sender = maria, amount = sp.mutez(100))
     #ending
     sc.h1("ending")
-    auction.getWinner()
+    time = time.add_minutes(2)
+    auction.end(time).run(sender = sofia, valid = False)
+    auction.end(time).run(sender = admin)
     
