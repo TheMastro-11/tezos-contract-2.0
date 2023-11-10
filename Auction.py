@@ -6,6 +6,7 @@ def main():
     class Auction(sp.Contract):
         def __init__ (self, startingBid, time, admin):
             self.data.admin = admin
+            self.data.bidders = {}
             self.data.top = sp.record(address = None ,amount = sp.mutez(0))
             self.data.startBid = startingBid
             self.data.duration = time
@@ -27,14 +28,32 @@ def main():
             
             #check if the bid is grater then the current one
             assert sp.amount > self.data.top.amount, "The bid has to be greater"
-            
-            if not self.data.top.address == None: #refund
-                sp.send(self.data.top.address.unwrap_some(), self.data.top.amount)
+
+            #check if someone already bidded and sender alredy bidded
+            if self.data.top.address.is_some(): 
+                #save the loosing bidder in map
+                self.data.bidders = sp.update_map(self.data.top.address, sp.Some(sp.Some(self.data.top.amount)),self.data.bidders)
+                #check for sender
+                if self.data.bidders.contains(sp.Some(sp.sender)): 
+                    #refund
+                    sp.send(sp.sender, self.data.bidders.get(sp.Some(sp.sender), default = sp.Some(sp.mutez(0))).unwrap_some())
+                    #delete from map
+                    del self.data.bidders[sp.Some(sp.sender)]
                 
+                    
+            #update top bidder    
             self.data.top.address = sp.Some(sp.sender)
             self.data.top.amount = sp.amount
             
+            
+        @sp.entry_point
+        def withdraw(self):
+            #check if the caller is a bidder
+            assert self.data.bidders.contains(sp.Some(sp.sender)), "You are not a bidder"
 
+            #refund
+            sp.send(sp.sender, self.data.bidders.get(sp.Some(sp.sender), default = sp.Some(sp.mutez(0))).unwrap_some())
+        
         @sp.entry_point
         def end(self, time):
             #check if the caller is the admin
@@ -78,10 +97,16 @@ def auctionTest():
     #second bid
     sc.h1("Second Bid")
     auction.bid().run(sender = piero, amount = sp.mutez(10), valid = False)
-    auction.bid().run(sender = piero, amount = sp.mutez(101))
+    auction.bid().run(sender = piero, amount = sp.mutez(150))
+    #sofia bid again
+    sc.h1("Sofia Bid again")
+    auction.bid().run(sender = sofia, amount = sp.mutez(160))
     #third bid
     sc.h1("Third Bid")
     auction.bid().run(sender = carla, amount = sp.mutez(1000))
+    #sofia ask refund
+    sc.h1("Sofia Refund")
+    auction.withdraw().run(sender = sofia)
     #ending
     sc.h1("ending")
     time = time.add_minutes(2)
