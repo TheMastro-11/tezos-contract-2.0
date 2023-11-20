@@ -21,7 +21,7 @@ def main():
 
         @sp.entry_point
         def donate(self):
-            tmp = sp.update_map(sp.Some(sp.sender), sp.Some(sp.Some(sp.amount)), self.data.contributors)
+            self.data.contributors = sp.update_map(sp.Some(sp.sender), sp.Some(sp.Some(sp.amount)), self.data.contributors)
 
     
         @sp.entry_point
