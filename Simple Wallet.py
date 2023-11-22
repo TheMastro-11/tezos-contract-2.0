@@ -8,6 +8,7 @@ def main():
         def __init__(self, _owner):
             self.data.owner = _owner
             self.data.transactions = {None : None}
+            self.data.currentID = 0
 
 
         @sp.entry_point
@@ -15,18 +16,17 @@ def main():
             assert sp.sender == self.data.owner, "You are not the owner"
             
 
-        
         @sp.entry_point
-        def createTransaction(self, _recipient, _value, _date):
+        def createTransaction(self, _recipient, _value, _data):
             assert sp.sender == self.data.owner, "You are not the owner"
 
-            transaction = sp.record(recipient = _recipient, value = _value, date = _date)
+            transaction = sp.record(recipient = _recipient, value = _value, data = _data)
             executed = False
-            ID = 1#utils.mutez_to_nat(transaction.value) * utils.seconds_of_timestamp(transaction.date)
+            self.data.currentID += 1
 
-            assert not self.data.transactions.contains(sp.Some(ID)), "Retry in 5 seconds"
+            sp.emit(self.data.currentID) #return transaction ID
                 
-            self.data.transactions = sp.update_map(sp.Some(ID), sp.Some(sp.Some((transaction, executed))), self.data.transactions)
+            self.data.transactions = sp.update_map(sp.Some(self.data.currentID), sp.Some(sp.Some((transaction, executed))), self.data.transactions)
 
 
         @sp.entry_point
@@ -40,12 +40,15 @@ def main():
             details = (transaction, True)
 
             self.data.transactions = sp.update_map(sp.Some(ID), sp.Some(sp.Some(details)), self.data.transactions)
+
             
         @sp.entry_point
         def withdraw(self):
             assert sp.sender == self.data.owner, "You are not the owner"
-
+            
             sp.send(sp.sender, sp.balance)
+            
+            
             
 
 
@@ -68,7 +71,8 @@ def testWallet():
     sc.h1("Deposit")
     simpleWallet.deposit().run(sender = admin, amount = sp.mutez(100))
     sc.h1("Create Transaction")
-    simpleWallet.createTransaction(sp.record(_recipient = pippo.address, _value = sp.mutez(10), _date = sp.timestamp_from_utc_now())).run(sender = admin)
+    transaction = sp.record(_recipient = pippo.address, _value = sp.mutez(10), _data = ()) 
+    simpleWallet.createTransaction(transaction).run(sender = admin)
     sc.h1("Execute Transaction")
     simpleWallet.executeTransaction(1)
     sc.h1("Withdraw")
