@@ -36,7 +36,7 @@ def main():
             return self.data.created
 
 
-@sp.add_test(name = "Simple Wallet")
+@sp.add_test(name = "Factory")
 def testWallet():
     #set scenario
     sc = sp.test_scenario([utils,main])
