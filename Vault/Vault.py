@@ -17,7 +17,7 @@ def main():
             pass
         
         @sp.entrypoint
-        def request(self):
+        def withdraw(self):
             assert self.data.depositDone == True, "Deposit not done"
             tmp = self.data.wait_time - sp.now
             self.data.wait_time = sp.add_seconds(sp.now, tmp)
@@ -25,7 +25,7 @@ def main():
             self.data.receiver = sp.Some(sp.sender)
             
         @sp.entrypoint
-        def withdraw(self):
+        def finalize(self):
             assert self.data.requestDone == True, "Request not done"
             assert self.data.wait_time <= sp.now, "Wait time not over"
             
@@ -59,11 +59,11 @@ def test():
     #entrypoint calls
     sc.h1("Deposit")
     Vault.deposit().run(amount = sp.tez(1))
-    sc.h1("Request")
-    Vault.request().run(sender = pippo)
+    sc.h1("Withdraw")
+    Vault.withdraw().run(sender = pippo)
     sc.h1("Cancel")
     #Vault.cancel("ciao").run(now = sp.timestamp(9))
-    sc.h1("Withdraw")
-    Vault.withdraw().run(now = sp.timestamp(11))
+    sc.h1("Finalize")
+    Vault.finalize().run(now = sp.timestamp(11))
         
         
