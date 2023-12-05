@@ -5,7 +5,7 @@ def main():
     class Storage(sp.Contract):
         def __init__(self):
             self.data.bytes = sp.bytes("0x00")
-            self.data.string = "Hello World"
+            self.data.string = ""
             
         @sp.entrypoint
         def storeBytes(self, _bytes):
@@ -33,4 +33,4 @@ def test():
     sc.h1("storeBytes")
     Storage.storeBytes(sp.bytes("0x01"))
     sc.h1("storeString")
-    Storage.storeString("Hello World 2")
+    Storage.storeString("Hello World")
