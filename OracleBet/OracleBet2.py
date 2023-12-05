@@ -52,9 +52,11 @@ def main():
             assert sp.level > self.data.deadline, "Deadline not reached"
             
             if sp.sender == self.data.player1.unwrap_some():
+                assert self.data.player1Deposit == True, "You didn't deposit yet"
                 assert self.data.player1Withdraw == None, "You already withdrew"
                 self.data.player1Withdraw = True
             else:
+                assert self.data.player2Deposit == True, "You didn't deposit yet"
                 assert self.data.player2Withdraw == None, "You already withdrew"
                 self.data.player2Withdraw = True
             
@@ -65,6 +67,7 @@ def main():
             assert sp.sender == self.data.oracle.unwrap_some(), "You are not the oracle"
             assert not self.data.player1 == None and self.data.player2Deposit == True, "1(2) player(s) didn't deposit yet"
             assert sp.level <= self.data.deadline, "Deadline reached"
+            assert _winner == self.data.player1.unwrap_some() or _winner == self.data.player2.unwrap_some(), "The winner you insert is not a player"
 
             self.data.winner = sp.Some(_winner)
 
