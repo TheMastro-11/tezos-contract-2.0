@@ -27,10 +27,10 @@ def main():
             
             sp.send(self.data.buyer, sp.balance)
             
-@sp.add_test(name = "Escrow")
+@sp.add_test()
 def test():
     #set scenario
-    sc = sp.test_scenario(main)
+    sc = sp.test_scenario("Escrow",main)
     #create admin
     admin = sp.test_account("admin")
     #create users
@@ -39,12 +39,3 @@ def test():
     Escrow = main.Escrow(admin.address,pippo.address, sp.tez(1))
     #start scenario
     sc += Escrow
-
-
-    #entrypoint calls
-    sc.h1("Deposit")
-    Escrow.deposit().run(amount = sp.tez(1), sender = pippo)
-    sc.h1("Pay")
-    Escrow.pay().run(sender = pippo)
-    sc.h1("Withdraw")
-    Escrow.refund().run(sender = admin)

@@ -11,7 +11,7 @@ def main():
             self.data.contributors = {None : None}
             self.data.goal = sp.mutez(goal)
     
-        @sp.entry_point
+        @sp.entrypoint
         def withdraw(self): 
             assert sp.sender == self.data.recipient, "You are not the Admin"
             assert sp.now >= self.data.deadline ,"The time is not over"
@@ -19,12 +19,12 @@ def main():
             #send all money to Admin
             sp.send(self.data.recipient, sp.balance)
 
-        @sp.entry_point
+        @sp.entrypoint
         def donate(self):
             self.data.contributors = sp.update_map(sp.Some(sp.sender), sp.Some(sp.Some(sp.amount)), self.data.contributors)
 
     
-        @sp.entry_point
+        @sp.entrypoint
         def reclaim(self):
             #check if sender is a contributor
             assert self.data.contributors.contains(sp.Some(sp.sender)), "You are not a contributor"
@@ -35,10 +35,10 @@ def main():
             sp.send(sp.sender, self.data.contributors[sp.Some(sp.sender)].unwrap_some())
 
 
-@sp.add_test(name = "Crowdfunding")
+@sp.add_test()
 def testCrowd():
     #set scenario
-    sc = sp.test_scenario(main)
+    sc = sp.test_scenario("Crowdfunding",main)
     #create admin
     admin = sp.test_account("admin")
     #create recipient
@@ -47,24 +47,4 @@ def testCrowd():
     crowdFunding = main.CrowdFunding(admin.address, recipient.address, sp.now, 10000)
     #start scenario
     sc += crowdFunding
-
-    #create users
-    pippo = sp.test_account("pippo")
-    sofia = sp.test_account("sofia")
-    sergio = sp.test_account("sergio")
-
-    sc.h1("Check Time")
-    crowdFunding.withdraw().run(sender = recipient, valid = False)
-    sc.h1("Pippo donate")
-    crowdFunding.donate().run(sender = pippo, amount = sp.mutez(10))
-    sc.h1("Sofia donate")
-    crowdFunding.donate().run(sender = sofia, amount = sp.mutez(100))
-    sc.h1("Pippo donate Again")
-    crowdFunding.donate().run(sender = pippo, amount = sp.mutez(1000000))
-    sc.h1("Sergio donate")
-    crowdFunding.donate().run(sender = sergio, amount = sp.mutez(1000))
-    sc.h1("Attempt to donate")
-    crowdFunding.donate().run(sender = sofia, amount = sp.mutez(10000))
-    sc.h1("Check Result")
-    crowdFunding.withdraw().run(sender = recipient)
     

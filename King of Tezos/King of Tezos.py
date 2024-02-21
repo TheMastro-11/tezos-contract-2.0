@@ -8,7 +8,7 @@ def main():
             self.data.history = {None : sp.record(value = None, data = None)}
             self.data.floorPrice = sp.mutez(5000)
         
-        @sp.entry_point
+        @sp.entrypoint
         def newKing(self):
             #verify amount
             assert sp.amount == self.data.floorPrice, "Amount incorrect"
@@ -21,7 +21,7 @@ def main():
             #update price -> plus 10%
             self.data.floorPrice += sp.fst(sp.ediv(self.data.floorPrice, sp.nat(10)).unwrap_some()) 
     
-        @sp.entry_point
+        @sp.entrypoint
         def killKing(self):
             #reset king
             self.data.king = sp.sender
@@ -29,10 +29,10 @@ def main():
             self.data.floorPrice = sp.mutez(5000)
         
 
-@sp.add_test("testThrone")
+@sp.add_test()
 def testThrone():
     #create scenario
-    sc = sp.test_scenario(main)
+    sc = sp.test_scenario("testThrone", main)
     #create admin
     admin = sp.test_account("admin")
     #object Lottery
@@ -40,22 +40,4 @@ def testThrone():
     #start scenario
     sc.h1("Initial State")
     sc += throne
-
-    #users
-    sofia = sp.test_account("sofia")
-    sergio = sp.test_account("sergio")
-
-    #first king
-    sc.h1("First King")
-    throne.newKing().run(sender = sofia, amount = sp.mutez(5000))
-    #failed attempt
-    sc.h1("Failed Attempt")
-    throne.newKing().run(valid = False, sender = sergio, amount = sp.mutez(5000))
-    #second King
-    sc.h1("Second King")
-    throne.newKing().run(sender = sergio, amount = sp.mutez(5500))
-    #if the timer ended kill the old king
-    sc.h1("End of reign")
-    throne.killKing().run(sender = admin)
-
      

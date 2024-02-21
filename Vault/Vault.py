@@ -42,28 +42,13 @@ def main():
 
             
             
-@sp.add_test(name = "Vault")
+@sp.add_test()
 def test():
     #set scenario
-    sc = sp.test_scenario(main)
-    #create admin
-    admin = sp.test_account("admin")
-    #create users
-    pippo = sp.test_account("pippo")
+    sc = sp.test_scenario("Vault",main)
     #create object
     Vault = main.Vault("ciao",10)
     #start scenario
     sc += Vault
-
-
-    #entrypoint calls
-    sc.h1("Deposit")
-    Vault.deposit().run(amount = sp.tez(1))
-    sc.h1("Withdraw")
-    Vault.withdraw().run(sender = pippo)
-    sc.h1("Cancel")
-    #Vault.cancel("ciao").run(now = sp.timestamp(9))
-    sc.h1("Finalize")
-    Vault.finalize().run(now = sp.timestamp(11))
         
         

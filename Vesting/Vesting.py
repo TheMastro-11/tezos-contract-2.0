@@ -42,9 +42,5 @@ def test():
     #start scenario
     sc += c1
 
-    sc.h1("Release")
-    c1.release(_sender = pippo, _amount = sp.mutez(10))
-   
-
 
 

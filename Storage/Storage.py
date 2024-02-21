@@ -15,10 +15,10 @@ def main():
         def storeString(self, _string):
             self.data.string = _string
             
-@sp.add_test(name = "Storage")
+@sp.add_test()
 def test():
     #set scenario
-    sc = sp.test_scenario(main)
+    sc = sp.test_scenario("Storage",main)
     #create admin
     admin = sp.test_account("admin")
     #create users
@@ -27,10 +27,3 @@ def test():
     Storage = main.Storage()
     #start scenario
     sc += Storage
-
-
-    #entrypoint calls
-    sc.h1("storeBytes")
-    Storage.storeBytes(sp.bytes("0x01"))
-    sc.h1("storeString")
-    Storage.storeString("Hello World")

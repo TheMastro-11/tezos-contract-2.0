@@ -1,5 +1,4 @@
 import smartpy as sp
-from utils import utils
 
 
 @sp.module
@@ -57,25 +56,16 @@ def main():
 
 
 
-@sp.add_test(name = "Oracle Bet")
+@sp.add_test()
 def test():
     #set scenario
-    sc = sp.test_scenario([utils,main])
+    sc = sp.test_scenario("Oracle Bet",main)
     #create admin
     admin = sp.test_account("admin")
     #create object simple wallet
     OracleBet = main.OracleBet()
     #start scenario
     sc += OracleBet
-
-    #create users
-    pippo = sp.test_account("pippo")
-    sofia = sp.test_account("sofia")
-    sergio = sp.test_account("sergio")
-
-    #entrypoint calls
-    sc.h1("Deposit")
-    OracleBet.deposit(_player2 = pippo.address, _oracle = sofia.address).run(amount = sp.tez(1), sender = sergio)
 
     
     

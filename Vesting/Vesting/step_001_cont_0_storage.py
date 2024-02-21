@@ -1,1 +1,0 @@
-sp.record(amount = sp.mutez(10), beneficiary = sp.address('tz1ZGCrEnrbp8SEeofrmwR1rbSRTWVipVfqD'), duration = 5, released = sp.tez(0), start = sp.timestamp(0))
