@@ -1,5 +1,4 @@
 import smartpy as sp
-from utils import utils
 
 
 @sp.module
@@ -36,28 +35,16 @@ def main():
             return self.data.created
 
 
-@sp.add_test(name = "Factory")
+@sp.add_test()
 def testWallet():
     #set scenario
-    sc = sp.test_scenario([utils,main])
+    sc = sp.test_scenario("Factory",main)
     #create admin
     admin = sp.test_account("admin")
     #create object simple wallet
     Factory = main.Factory(admin.address)
     #start scenario
     sc += Factory
-
-    #create users
-    pippo = sp.test_account("pippo")
-    sofia = sp.test_account("sofia")
-    sergio = sp.test_account("sergio")
-
-    sc.h1("Create Contract")
-    Factory.createProduct(sp.record(_tagstring = "Primo", _creator = admin.address))
-    #dyn0 = sc.dynamic_contract(0, Factory.createProduct("Primo"))
-    sc.h1("All contracts created")
-    sc.show(Factory.getProducts())
-    sc.h1("getTag")
     
 
     
