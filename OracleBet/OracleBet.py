@@ -60,8 +60,6 @@ def main():
 def test():
     #set scenario
     sc = sp.test_scenario("Oracle Bet",main)
-    #create admin
-    admin = sp.test_account("admin")
     #create object simple wallet
     OracleBet = main.OracleBet()
     #start scenario
