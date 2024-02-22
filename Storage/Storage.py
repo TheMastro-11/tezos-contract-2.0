@@ -19,10 +19,6 @@ def main():
 def test():
     #set scenario
     sc = sp.test_scenario("Storage",main)
-    #create admin
-    admin = sp.test_account("admin")
-    #create users
-    pippo = sp.test_account("pippo")
     #create object
     Storage = main.Storage()
     #start scenario
