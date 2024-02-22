@@ -30,12 +30,10 @@ def main():
 def test():
     #set scenario
     sc = sp.test_scenario("Vesting", main)
-    #create admin
-    admin = sp.test_account("admin")
     #create users
-    pippo = sp.test_account("pippo")
+    beneficiary = sp.test_account("beneficiary")
     #create object
-    c1 = main.Vesting(pippo.address, sp.now, 5)
+    c1 = main.Vesting(beneficiary.address, sp.now, 5)
     #start scenario
     sc += c1
 
