@@ -32,10 +32,10 @@ def test():
     #set scenario
     sc = sp.test_scenario("Escrow",main)
     #create admin
-    admin = sp.test_account("admin")
+    seller = sp.test_account("seller")
     #create users
-    pippo = sp.test_account("pippo")
+    buyer = sp.test_account("buyer")
     #create object
-    Escrow = main.Escrow(admin.address,pippo.address, sp.tez(1))
+    Escrow = main.Escrow(seller.address,buyer.address, sp.tez(1))
     #start scenario
     sc += Escrow
