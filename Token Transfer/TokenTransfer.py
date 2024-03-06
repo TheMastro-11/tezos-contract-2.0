@@ -47,17 +47,27 @@ def m():
         @sp.entrypoint
         def deposit(self, batch):
             sp.cast(batch, types.deposit_params)
+            contract = sp.contract(t.transfer_params, batch.contract_address , entrypoint="transfer")
+            sp.transfer([sp.record(from_ = sp.sender, 
+                                   txs = [sp.record(
+                                            to_ = sp.self_address(),
+                                            token_id = batch.token_id,
+                                            amount = batch.amount_,
+                                            )])],
+                        sp.tez(0), 
+                        contract.unwrap_some(error="ContractNotFound"))
+
             tx = sp.record(
                 to_ = batch.recipient_,
                 token_id = batch.token_id,
                 amount = batch.amount_,
             )
-            info = sp.record(from_ = sp.sender, txs = [tx])
-        
+            info = sp.record(from_ = sp.self_address(), txs = [tx])
             self.data.tokenStored[batch.token_id] = sp.record(
                     info_ = info,
                     contract_address = batch.contract_address
             )
+            
 
         @sp.entrypoint
         def withdraw(self, _token_id):
@@ -66,9 +76,7 @@ def m():
                 assert sp.sender == i.to_, "You are not the owner"
                 contract = sp.contract(t.transfer_params, value.contract_address , entrypoint="transfer")
                 sp.transfer([value.info_], sp.tez(0), contract.unwrap_some(error="ContractNotFound"))
-            
-            
-                
+                   
         
 def make_metadata(symbol, name, decimals, image):
     """Helper function to build metadata JSON bytes values."""
@@ -89,10 +97,6 @@ def testToken():
     sc = sp.test_scenario("TokenGenerator", [fa2.t, fa2.main, types, m])
     #Create Users
     owner = sp.test_account("owner")
-    bob = sp.test_account("bob")
-    #Create token metadata
-    tok0_md = make_metadata(name="Token Zero", decimals=1, symbol="Tok0", image = "imagine")
-    tok1_md = make_metadata(name="Token Uno", decimals=1, symbol="Tok1", image = "imagine2")
     #create Contract Object
     sc.h1("TokenGenerator Contract Creation")   
     sc.h3("Empty Value")
@@ -107,46 +111,6 @@ def testToken():
     sc.h1("TokenTransfer Contract Creation")
     c2 = m.TokenTransfer()
     sc += c2
-   
-   
-    sc.h1("Mint a new token")
-    c1.mint(
-        [
-            sp.record(
-                to_  = owner.address, # Who will receive the original mint
-                metadata = tok0_md
-            )
-        ],
-        _sender=owner)
 
-    
-    #Add Operator
-    sc.h1("Add Operator")
-    c1.update_operators([
-        sp.variant("add_operator", sp.record(
-            owner = owner.address,
-            operator = c2.address,
-            token_id = 0))
-        ],
-        _sender=owner)
-    
-    
-    #Deposit a token to contract
-    sc.h1("Deposit")
-    c2.deposit(sp.record(
-        amount_ = sp.nat(1), 
-        token_id = sp.nat(0), 
-        recipient_ = bob.address, 
-        contract_address = c1.address
-    ), _sender = owner)
 
-    #Withdraw a token from contract
-    sc.h1("Withdraw")
-    c2.withdraw(sp.nat(0), _sender = bob)
 
-    c1.transfer([
-        sp.record(
-            from_ = bob.address,
-            txs = [
-                sp.record(to_ = owner.address, amount=1, token_id=0)
-            ])], _sender = owner)
