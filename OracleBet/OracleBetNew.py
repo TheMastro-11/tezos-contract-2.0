@@ -28,7 +28,7 @@ def main():
             self.data.deadline += sp.level
 
         @sp.entrypoint
-        def deposit2(self):
+        def deposit(self):
             assert sp.sender == self.data.player2.unwrap_some(), "You are not player 2"
             assert sp.amount == sp.tez(1), "Amount incorrect, must be 1 tez"
             assert self.data.player2Deposit == False, "You already deposited"
@@ -51,8 +51,6 @@ def main():
                 self.data.player2Withdraw = True
                 sp.send(self.data.player2.unwrap_some(), sp.tez(1))
                 
-            
-           
 
         @sp.entrypoint
         def win(self, _winner):
