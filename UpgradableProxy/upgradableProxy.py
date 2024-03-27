@@ -21,6 +21,11 @@ def main():
             
             self.data.logicAddress = address
             
+        @sp.entrypoint
+        def check(self, value):
+            contract = sp.contract(sp.mutez, self.data.logicAddress , entrypoint="check")
+            sp.transfer(value, sp.tez(0), contract.unwrap_some(error="ContractNotFound"))
+            
         
     class Caller(sp.Contract):
         def __init__ (self, admin):
