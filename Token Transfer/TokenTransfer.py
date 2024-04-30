@@ -111,6 +111,3 @@ def testToken():
     sc.h1("TokenTransfer Contract Creation")
     c2 = m.TokenTransfer()
     sc += c2
-
-
-
