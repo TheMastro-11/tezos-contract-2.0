@@ -1,44 +1,20 @@
-import myLibrary as lb
+from pytezos import pytezos, Key, PyTezosClient
+import time
+import sys
+from prettyPrints import *
+from dataStructures import *
 
-class color:
-   PURPLE = '\033[95m'
-   CYAN = '\033[96m'
-   DARKCYAN = '\033[36m'
-   BLUE = '\033[94m'
-   GREEN = '\033[92m'
-   YELLOW = '\033[93m'
-   RED = '\033[91m'
-   BOLD = '\033[1m'
-   UNDERLINE = '\033[4m'
-   END = '\033[0m'
-   
-#dict with all contracts
-contracts = {
-    "simpleTransfer" : "KT1JPWgfwodv4j2zD1FATzfGsRCNkAhfVa7D",
-    "auction" : "KT19Yw7uupmjzkCUsAmLEsujpZoR3LHwHjTJ",
-    "kingOfTezos" : "KT1XTv6oPMgX6RbepELh8E6R1GCYU6rArX1x",
-    "crowdFunding" : "KT1XQ3Vkxqd54kbpFozpSGd676zdSfPMqrPS",
-    "hashTimedLockedContract" : "KT1SHqNQ7L3gSo9mPWUaTnwRh9RidTmbf7c7",
-    "tokenTransfer" : "KT1DDT97EvCDR1PYLo1umZt3RuAdJ3Yg1ruZ"
-    }
+KEY = Key.from_encoded_key("edskS7VWazgioXEcBLhZ48sXmcwNmQ9HCx4q3tWch4MHdYVC7H4qAKtMbNQCZBQbAAL5WaduKA2H4fg8B7f2anEqZhpdXwk1yK")
 
-def print_contractsInfo(contractSelected):
-    print("Alias :",contractSelected, "\nAddress :", contracts[contractSelected])
-    
-    
+MUTEZ = 1000000
+
+loginStatus = False #track the login status of user
+
+
 def menu():
     # Welcome message
     print("Welcome to UnicaTezos!\n")
-
-    while(1):{
-        # Menu selection
-        menuSelection()
-    }
-        
-    #builder = lb.pytezos.contract(contracts[contract])
-    #print(builder.parameter)
     
-def menuSelection():
     # Function for menu selection
     print("What would you like to do?\n")
     print("1) Insert new contract\n2) Open memory\n\
@@ -47,7 +23,7 @@ def menuSelection():
     # Check user input
     selection = input("...")
     if selection == "q":
-        lb.sys.exit()
+        sys.exit()
     if selection in ["1", "2"]: 
         if selection == "1":
             # Insert a new contract
@@ -59,7 +35,7 @@ def menuSelection():
         # Error message for invalid selection
         print(color.RED + color.BOLD + "ERROR! Invalid selection\n" + color.END) 
         # Recall the function for a new selection
-        menuSelection()
+        menu()
         
 def newContract():
     # Function to insert a new contract
@@ -105,7 +81,7 @@ def contractManage(contractSelected):
     # Check user input
     selection = input("...")
     if selection == "q":
-        lb.sys.exit()
+        sys.exit()
     if selection in ["1", "2", "3"]: 
         match selection:
             case "1": 
@@ -140,8 +116,65 @@ def contractManage(contractSelected):
     
 def contractUse(contractSelected):
     print("\n\n", color.BOLD + color.BLUE + contractSelected + color.END)
-    address = contracts[contractSelected]
-    print("ciao")
+    
+    builder = pytezos.contract(contracts[contractSelected])
+    
+    print("Please login before continue\n")
+    loginStatus = login()
+    
+    print_contractsInfo(contractSelected)
+    
+    while(1):
+        selection = input("Which Entrypoints do you want to call?\n")
+        try:
+            entrypoint = getattr(builder, selection)
+            break
+        except:
+            # Error message for invalid selection
+            print(color.RED + color.BOLD + "ERROR! Invalid selection\n" + color.END) 
+            # Doing the loop function for a new selection
+    
+    entrypoint_data = {'address': pytezos.address}
+    
+    operation = (
+        builder
+        .deposit(pytezos.key.public_key_hash())
+        .with_amount(1)  
+        .as_transaction()
+    )
+   
+    
+
+
+def login():
+    '''
+    selection = input("Insert your " + color.BOLD + "secret Key" + color.END + " or " + color.BOLD + "Mnemonic Phrase" + color.END + "\n q for quit\n... ")
+    
+    if selection == "q":
+        sys.exit()
+    
+    try:
+        key = Key.from_encoded_key(selection)
+    except:
+        try:
+            selection = selection.split()
+            key = Key.from_mnemonic(mnemonic = selection)
+        except:
+            # Error message for invalid selection
+            print(color.RED + color.BOLD + "ERROR! Invalid selection\n" + color.END) 
+            # Recall the function for a new selection
+            return login()
+    '''
+    
+    key = KEY ##REMOVE IT
+    
+    global pytezos
+    pytezos = pytezos.using(key=key)
+    print_walletInfo()
+    
+    return True
+
+    
     
     
 def contractModify(contractSelected):
@@ -171,4 +204,4 @@ def contractModify(contractSelected):
         # Recall the function for a new selection
         contractModify(contractSelected)
     
-    menuSelection()
+    menu()
