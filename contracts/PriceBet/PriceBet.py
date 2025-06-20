@@ -58,7 +58,7 @@ def main():
 
 
 @sp.add_test()
-def testBet():
+def test():
     # set scenario
     sc = sp.test_scenario("PriceBet", main)
     admin = sp.test_account("admin")

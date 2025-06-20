@@ -20,9 +20,9 @@ def main():
 
 
 @sp.add_test()
-def testBet():
+def test():
     # set scenario
-    sc = sp.test_scenario("PriceBet", main)
+    sc = sp.test_scenario("PaymentSplitter", main)
     admin = sp.test_account("admin")
     mario = sp.test_account("mario")
     map = { admin.address : sp.nat(80), mario.address : sp.nat(20)}

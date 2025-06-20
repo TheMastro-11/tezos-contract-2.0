@@ -67,14 +67,14 @@ def main():
 
 
 @sp.add_test()
-def auctionTest():
+def test():
     # set scenario
-    sc = sp.test_scenario("auctionTest", main)
+    sc = sp.test_scenario("Auction", main)
     # create admin
-    admin = sp.test_account("admin")
+    admin = sp.address(input("Inserisci l'indirizzo dell'admin: ")) 
     # create time
     time = sp.timestamp_from_utc_now()  # calculate execution time
     # new object Auction
-    auction = main.Auction(sp.mutez(5), time, admin.address, "reason")
+    auction = main.Auction(sp.mutez(5), time, admin, "reason")
     # start scenario
     sc += auction

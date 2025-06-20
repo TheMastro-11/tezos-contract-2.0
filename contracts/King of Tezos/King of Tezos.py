@@ -30,9 +30,9 @@ def main():
         
 
 @sp.add_test()
-def testThrone():
+def test():
     #create scenario
-    sc = sp.test_scenario("testThrone", main)
+    sc = sp.test_scenario("KingOfTezos", main)
     #create admin
     admin = sp.test_account("admin")
     #object Lottery

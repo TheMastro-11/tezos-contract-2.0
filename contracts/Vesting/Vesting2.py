@@ -29,7 +29,7 @@ def main():
 @sp.add_test()
 def test():
     #set scenario
-    sc = sp.test_scenario("Vesting", main)
+    sc = sp.test_scenario("Vesting2", main)
     #create users
     beneficiary = sp.test_account("beneficiary")
     #create object

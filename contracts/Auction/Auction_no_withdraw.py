@@ -1,5 +1,4 @@
 import smartpy as sp
-from utils import utils
 
 @sp.module
 def main():
@@ -51,9 +50,9 @@ def main():
 
 
 @sp.add_test()
-def auctionTest():
+def test():
     #set scenario
-    sc = sp.test_scenario("auctionTest",main)
+    sc = sp.test_scenario("Auction",main)
     #create admin
     admin = sp.test_account("admin")
     #create time 

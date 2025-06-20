@@ -35,7 +35,7 @@ def main():
 
 
 @sp.add_test()
-def testHTLC():
+def test():
     # set scenario
     sc = sp.test_scenario("HTLC", main)
     committer = sp.test_account("committer")

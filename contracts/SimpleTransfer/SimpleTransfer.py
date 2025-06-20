@@ -21,7 +21,7 @@ def main():
             sp.send(self.data.receiver, sp.balance)
 
 @sp.add_test()
-def testSimpleTransfer():
+def test():
     # set scenario
     sc = sp.test_scenario("SimpleTransfer", main)
     owner = sp.test_account("owner")

@@ -55,9 +55,9 @@ def main():
 
 
 @sp.add_test()
-def testWallet():
+def test():
     # set scenario
-    sc = sp.test_scenario("Simple Wallet", [t,main])
+    sc = sp.test_scenario("SimpleWallet", [t,main])
     # create admin
     admin = sp.test_account("admin")
     # create object simple wallet

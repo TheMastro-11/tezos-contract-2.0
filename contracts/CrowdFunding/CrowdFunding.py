@@ -36,7 +36,7 @@ def main():
 
 
 @sp.add_test()
-def testCrowd():
+def test():
     #set scenario
     sc = sp.test_scenario("Crowdfunding",main)
     #create admin

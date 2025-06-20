@@ -94,7 +94,7 @@ def make_metadata(symbol, name, decimals, image):
 @sp.add_test()
 def testToken():  
     #Create Scenario
-    sc = sp.test_scenario("TokenGenerator", [fa2.t, fa2.main, types, m])
+    sc = sp.test_scenario("TokenTransfer", [fa2.t, fa2.main, types, m])
     #Create Users
     owner = sp.test_account("owner")
     #create Contract Object

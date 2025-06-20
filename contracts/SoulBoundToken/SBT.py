@@ -113,9 +113,9 @@ def make_metadata(batch):
     '''
 
 @sp.add_test()
-def testSBT():  
+def test():  
     #Create Scenario
-    sc = sp.test_scenario("TokenGenerator", [fa2.t, fa2.main, types, m])
+    sc = sp.test_scenario("SBT", [fa2.t, fa2.main, types, m])
     #Create Users
     owner = sp.test_account("owner")
     #create Contract Object
