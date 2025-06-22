@@ -5,6 +5,7 @@ import time
 import subprocess
 import sys
 
+MUTEZ_CONV = 1000000
 ##Compiler
 def compileContract(contractPath) :
     print(f">>> Compiling '{contractPath}'...")
@@ -98,18 +99,18 @@ def contractInfoResult(op_result):
         print(f"Errore: {e}")
 
 ##Contract Call
-def entrypointCall(client, contractAddress, entrypointName, parameters):
+def entrypointCall(client, contractAddress, entrypointName, parameters, tezAmount):
 
     contract_interface = client.contract(contractAddress)
 
-    print(f"\n Calling {entrypointName} entrypoint...")
+    print(f"\n Calling {entrypointName} entrypoint...\n")
 
     try:
         entrypoint = getattr(contract_interface, entrypointName)
         if parameters == None :
-            op = entrypoint(parameters).send()
+            op = entrypoint(parameters).with_amount(tezAmount * MUTEZ_CONV).send()
         else :
-            op = entrypoint(parameters).send(parameters)
+            op = entrypoint(parameters).with_amount(tezAmount * MUTEZ_CONV).send(parameters)
             
         op_hash = op.hash()
         print(f"Operation Send! Hash: {op_hash}")
@@ -144,29 +145,30 @@ def entrypointAnalyse(client, contractAddress):
     
     try:
         contract = client.contract(contractAddress)
+        del contract.entrypoints["default"]
         
         for entrypoint_name, entrypoint_object in contract.entrypoints.items():
-            print(f"📌 Entrypoint: \"{entrypoint_name}\"")
+            #print(f"📌 Entrypoint: \"{entrypoint_name}\"")
     
             if hasattr(entrypoint_object, 'json_type'):
                 parameter_schema = entrypoint_object.json_type()
                 
                 if parameter_schema.get('title') == 'unit':
-                    print("   Parameter: No required (type 'Unit').")
+                    #print("   Parameter: No required (type 'Unit').")
                     entrypointSchema[entrypoint_name] = "unit"
                 else:
-                    print("   Parameter:")
+                    #print("   Parameter:")
                     lst = []
                     properties = parameter_schema.get('properties', {})
                     for param_name, param_details in properties.items():
                         param_type = param_details.get('title')
                         param_format = f" (details: {param_details.get('format', 'N/D')})"
-                        print(f"     - name: `{param_name}`, Type: `{param_type}`{param_format}")
+                        #print(f"     - name: `{param_name}`, Type: `{param_type}`{param_format}")
                         entrypointSchema[entrypoint_name] = lst.append((param_name, (param_type, param_format)))
             else:
                 param_type = entrypoint_object.prim
-                print("   Parameter required:")
-                print(f"     - Name: `_` (parametro singolo), Type: `{param_type}`")
+                #print("   Parameter required:")
+                #print(f"     - Name: `_` (parametro singolo), Type: `{param_type}`")
                 entrypointSchema[entrypoint_name] = param_type
                     
         return entrypointSchema
