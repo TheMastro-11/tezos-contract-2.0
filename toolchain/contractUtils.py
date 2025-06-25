@@ -68,6 +68,7 @@ def contractInfoResult(op_result):
     deployReport = {}
     
     try:
+        deployReport["hash"] = op_result["hash"]
         content = op_result['contents'][0]
         metadata = content.get('metadata', {})
         op_result_info = metadata.get('operation_result', {})
@@ -134,8 +135,9 @@ def entrypointCall(client, contractAddress, entrypointName, parameters, tezAmoun
             print("Operation could be failed or not choosen by bakers. (check fees)")
 
         # Per verificare, puoi leggere il nuovo valore dello storage
-        new_storage = contract_interface.storage()
-        print(f"Il nuovo valore nello storage è: {new_storage}")
+        #new_storage = contract_interface.storage()
+        #print(f"Il nuovo valore nello storage è: {new_storage}")
+        return op_result
 
     except Exception as e:
         print(f"Si è verificato un errore: {e}")
@@ -175,3 +177,39 @@ def entrypointAnalyse(client, contractAddress):
 
     except Exception as e:
         print(f"An error occurred: {e}")
+        
+def callInfoResult(op_result):
+    print("\n" + "="*20 + " COST ANALYZIS " + "="*20)
+    deployReport = {}
+    
+    try:
+        deployReport["hash"] = op_result["hash"]
+        content = op_result['contents'][0]
+        metadata = content.get('metadata', {})
+        op_result_info = metadata.get('operation_result', {})
+        
+
+        # BakerFee
+        fee_mutez = int(content.get('fee', 0))
+        deployReport["BakerFee"] = fee_mutez
+
+        # Gas
+        consumed_milligas = int(op_result_info.get('consumed_milligas', 0))
+        deployReport["Gas"] = consumed_milligas
+
+        # Storage Fee (Burn)
+        if ('paid_storage_size_diff' in op_result_info):
+            storage_size_diff = int(op_result_info.get('paid_storage_size_diff', 0))
+            storage_burn_cost_mutez = storage_size_diff * 250
+            deployReport["Storage"] = storage_burn_cost_mutez
+        else:
+            storage_burn_cost_mutez = 0
+            
+        
+        total_cost_mutez = fee_mutez + storage_burn_cost_mutez
+        deployReport["TotalCost"] = total_cost_mutez
+        
+        return deployReport
+
+    except (KeyError, IndexError, TypeError) as e:
+        print(f"Errore: {e}")
