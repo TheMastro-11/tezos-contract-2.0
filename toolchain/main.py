@@ -1,5 +1,6 @@
 from contractUtils import *    
 from folderScan import *
+from csvUtils import *
 
 
 def interactionSetup(client, contract):
@@ -24,8 +25,19 @@ def interactionSetup(client, contract):
         parameters = input("Insert parameters value: ")
     tezAmount = int(input("Insert tez amount: "))
     
-    entrypointCall(client=client, contractAddress=contractAddress, entrypointName=entryList[entrypointSel-1], parameters=parameters, tezAmount=tezAmount)
+    op_result = entrypointCall(client=client, contractAddress=contractAddress, entrypointName=entryList[entrypointSel-1], parameters=parameters, tezAmount=tezAmount)
+    return callInfoResult(opResult=op_result)
     
+def exportResult(opResult):
+    sel = input("Do you want to export the result?(y/n):  ")
+    
+    if sel == "y":
+        fileName = "transactionsOutput.csv"
+        csvWriter(fileName=fileName, op_result=opResult)
+        print("\nFile Updated!\n\n")
+    
+    
+      
 def main(client):
     stdPath = "../contracts/"
     
@@ -58,12 +70,14 @@ def main(client):
                 op_result = origination(client=client, michelsonCode=michelsonPath, initialStorage=storagePath)
                 contractInfo = contractInfoResult(op_result=op_result)
                 addressUpdate(contract=contract, newAddress=contractInfo["address"])
-                main(client=client)
             else:
                 print("\n\033[1m Contract must be compiled before \033[0m\n\n")
-                main(client=client)
+            
+            main(client=client)
+            
         case 3: 
-            interactionSetup(client=client, contract=contract)
+            op_report = interactionSetup(client=client, contract=contract)
+            exportResult(opResult=op_report)
             main(client=client)
             
 

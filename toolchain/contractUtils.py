@@ -178,13 +178,13 @@ def entrypointAnalyse(client, contractAddress):
     except Exception as e:
         print(f"An error occurred: {e}")
         
-def callInfoResult(op_result):
+def callInfoResult(opResult):
     print("\n" + "="*20 + " COST ANALYZIS " + "="*20)
     deployReport = {}
     
     try:
-        deployReport["hash"] = op_result["hash"]
-        content = op_result['contents'][0]
+        deployReport["Hash"] = opResult["hash"]
+        content = opResult['contents'][0]
         metadata = content.get('metadata', {})
         op_result_info = metadata.get('operation_result', {})
         
