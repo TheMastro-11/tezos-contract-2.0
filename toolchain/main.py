@@ -1,6 +1,7 @@
 from contractUtils import *    
 from folderScan import *
 from csvUtils import *
+from jsonUtils import *
 
 
 def interactionSetup(client, contract):
@@ -32,10 +33,12 @@ def exportResult(opResult):
     sel = input("Do you want to export the result?(y/n):  ")
     
     if sel == "y":
-        fileName = "transactionsOutput.csv"
-        csvWriter(fileName=fileName, op_result=opResult)
-        print("\nFile Updated!\n\n")
-    
+        fileName = "transactionsOutput"
+        csvWriter(fileName=fileName+".csv", op_result=opResult)
+        print("\nCSV Updated!\n\n")
+        jsonWriter(fileName=fileName+".json", opReport=opResult)
+        print("\nJSON Updated!\n\n")
+        
     
       
 def main(client):
