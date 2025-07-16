@@ -1,22 +1,32 @@
 import csv
-import pprint
+from folderScan import *
 
-def csvReader(fileName):
+def csvReader():
+    executionTraces = folderScan("execution_traces")
+    executionTracesDict = {}
     try:
-        with open(fileName, mode='r', newline='', encoding='utf-8') as file_csv:
-            csv_read = csv.reader(file_csv)
+        for trace in executionTraces:
+            fileName = "execution_traces/"+trace
+            rows = {}
+            
+            with open(fileName, mode='r', newline='', encoding='utf-8') as file_csv:
+                csv_read = csv.reader(file_csv)
 
-            print(f"--- Reading transcations: {fileName} ---")
-            for row in csv_read:
-                print("RIGA", row)
-                print(row[0].split(";"))
-
-            print("--- End ---")
-
+                i = 0
+                for row in csv_read:
+                    newRow = row[0].split(";")
+                    rows[newRow.pop(0)] = newRow
+                    i += 1
+                    
+            executionTracesDict[trace.replace(".csv","")] = rows
+            
+        return executionTracesDict
+    
     except FileNotFoundError:
         print(f"Error: File '{fileName}' not found.")
     except Exception as e:
         print(f"Error: {e}")
+    
 
 
 def csvWriter(fileName, op_result):
@@ -25,7 +35,8 @@ def csvWriter(fileName, op_result):
         csv_read = csv.reader(file_csv)
         for row in csv_read:
                 print("RIGA", row)
-                print(row[0].split(";"))
+                if row != []:
+                    print(row[0].split(";"))
                 i += 1
         
         
