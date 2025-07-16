@@ -64,7 +64,7 @@ def origination(client, michelsonCode, initialStorage):
         print(f"Error {e}")
 
 def contractInfoResult(op_result):
-    print("\n" + "="*20 + " COST ANALYZIS " + "="*20)
+    #print("\n" + "="*20 + " COST ANALYZIS " + "="*20)
     deployReport = {}
     
     try:
@@ -138,7 +138,6 @@ def entrypointCall(client, contractAddress, entrypointName, parameters, tezAmoun
         #new_storage = contract_interface.storage()
         #print(f"Il nuovo valore nello storage è: {new_storage}")
         return op_result
-
     except Exception as e:
         print(f"Si è verificato un errore: {e}")
 
@@ -179,7 +178,7 @@ def entrypointAnalyse(client, contractAddress):
         print(f"An error occurred: {e}")
         
 def callInfoResult(opResult):
-    print("\n" + "="*20 + " COST ANALYZIS " + "="*20)
+    #print("\n" + "="*20 + " COST ANALYZIS " + "="*20)
     deployReport = {}
     
     try:
