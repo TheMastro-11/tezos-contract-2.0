@@ -21,7 +21,7 @@ def compileContract(contractPath) :
         print(f"\nERROR: '{contractPath}' raise an exception.")
 
 ##Deploy
-def origination(client, michelsonCode, initialStorage):
+def origination(client, michelsonCode, initialStorage, initialBalance):
 
     parsed_code = michelson_to_micheline(michelsonCode)
     parsed_storage = michelson_to_micheline(initialStorage)
@@ -33,7 +33,8 @@ def origination(client, michelsonCode, initialStorage):
             script={
                 'code': parsed_code,
                 'storage': parsed_storage
-            }
+            },
+            balance = initialBalance * MUTEZ_CONV
         ).autofill().sign()
         
         op_hash = op_group.inject(_async=False)['hash']
@@ -108,10 +109,7 @@ def entrypointCall(client, contractAddress, entrypointName, parameters, tezAmoun
 
     try:
         entrypoint = getattr(contract_interface, entrypointName)
-        if parameters == None :
-            op = entrypoint(parameters).with_amount(tezAmount * MUTEZ_CONV).send()
-        else :
-            op = entrypoint(parameters).with_amount(tezAmount * MUTEZ_CONV).send(parameters)
+        op = entrypoint(parameters).with_amount(tezAmount * MUTEZ_CONV).send()
             
         op_hash = op.hash()
         print(f"Operation Send! Hash: {op_hash}")
@@ -146,7 +144,8 @@ def entrypointAnalyse(client, contractAddress):
     
     try:
         contract = client.contract(contractAddress)
-        del contract.entrypoints["default"]
+        if len(contract.entrypoints) > 1:
+            del contract.entrypoints["default"]
         
         for entrypoint_name, entrypoint_object in contract.entrypoints.items():
             #print(f"📌 Entrypoint: \"{entrypoint_name}\"")

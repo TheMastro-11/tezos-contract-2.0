@@ -8,7 +8,8 @@ def interactionSetup(client, contract):
     contractAddress = addressValid[contract]
     contractInterface = pytezos.contract(contractAddress)
     entrypoints = contractInterface.entrypoints
-    del entrypoints["default"]
+    if len(entrypoints) > 1:
+        del entrypoints["default"]
     
     i = 1
     entryList = []
@@ -23,10 +24,15 @@ def interactionSetup(client, contract):
     parameters = None
     if entrypointParam != "unit":
         parameters = input("Insert parameters value: ")
+        if "," in parameters:
+            parameters = parameters.split(",")
     tezAmount = int(input("Insert tez amount: "))
     
-    op_result = entrypointCall(client=client, contractAddress=contractAddress, entrypointName=entryList[entrypointSel-1], parameters=parameters, tezAmount=tezAmount)
-    return callInfoResult(opResult=op_result)
+    opResult = entrypointCall(client=client, contractAddress=contractAddress, entrypointName=entryList[entrypointSel-1], parameters=parameters, tezAmount=tezAmount)
+    infoResult = callInfoResult(opResult=opResult)
+    infoResult["contract"] = contract
+    infoResult["entryPoint"] = entryList[entrypointSel-1]
+    return infoResult
 
 def executionSetup(contract,rows):
     infoResultDict = {}
@@ -53,7 +59,11 @@ def executionSetup(contract,rows):
         client = pytezos.using(shell="ghostnet", key=key)
         
         opResult = entrypointCall(client=client, contractAddress=contractAddress, entrypointName=entrypointSel, parameters=parameters, tezAmount=tezAmount)
-        infoResultDict[element] = callInfoResult(opResult=opResult)
+        infoResult = callInfoResult(opResult=opResult)
+        infoResult["contract"] = contract
+        infoResult["entryPoint"] = entrypointSel
+
+        infoResultDict[element] = infoResult
 
     return infoResultDict
     
@@ -102,7 +112,8 @@ def main():
             if Path("./"+contract).exists():   
                 michelsonPath = Path(f"./{contract}/step_001_cont_0_contract.tz").read_text()
                 storagePath = Path(f"./{contract}/step_001_cont_0_storage.tz").read_text()
-                op_result = origination(client=client, michelsonCode=michelsonPath, initialStorage=storagePath)
+                initialBalance = int(input("Insert an initial balance:"))
+                op_result = origination(client=client, michelsonCode=michelsonPath, initialStorage=storagePath, initialBalance=initialBalance)
                 contractInfo = contractInfoResult(op_result=op_result)
                 addressUpdate(contract=contract, newAddress=contractInfo["address"])
             else:
