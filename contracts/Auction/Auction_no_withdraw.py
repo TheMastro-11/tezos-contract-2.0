@@ -35,12 +35,12 @@ def main():
             
 
         @sp.entrypoint
-        def end(self, time):
+        def end(self):
             #check if the caller is the admin
             assert sp.sender == self.data.admin, "You are not the admin"
 
             #check if deadline is reached
-            assert time >= self.data.duration, "Deadline is not reached"
+            assert sp.now >= self.data.duration, "Deadline is not reached"
             
             #withdraw all the assets
             sp.send(self.data.admin, sp.balance)
