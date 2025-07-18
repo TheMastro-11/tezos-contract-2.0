@@ -35,7 +35,7 @@ def csvWriter(fileName, op_result):
         csv_read = csv.reader(file_csv)
     ''' 
         
-    newRow = [op_result["contract"], op_result["entryPoint"], op_result["TotalCost"], op_result["Hash"]]
+    newRow = [op_result["contract"], op_result["entryPoint"], op_result["TotalCost"], op_result["Weight"], op_result["Hash"]]
     with open(fileName, mode='a', newline='', encoding='utf-8') as file_csv:
         writer = csv.writer(file_csv)
 

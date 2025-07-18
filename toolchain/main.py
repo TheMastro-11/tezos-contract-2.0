@@ -26,6 +26,8 @@ def interactionSetup(client, contract):
         parameters = input("Insert parameters value: ")
         if "," in parameters:
             parameters = parameters.split(",")
+        else:
+            parameters = [parameters]
     tezAmount = int(input("Insert tez amount: "))
     
     opResult = entrypointCall(client=client, contractAddress=contractAddress, entrypointName=entryList[entrypointSel-1], parameters=parameters, tezAmount=tezAmount)
