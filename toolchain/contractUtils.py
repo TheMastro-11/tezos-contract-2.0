@@ -109,8 +109,13 @@ def entrypointCall(client, contractAddress, entrypointName, parameters, tezAmoun
 
     try:
         entrypoint = getattr(contract_interface, entrypointName)
-        op = entrypoint(parameters).with_amount(tezAmount * MUTEZ_CONV).send()
-            
+        if parameters == [] or parameters == None:
+            op = entrypoint().with_amount(tezAmount * MUTEZ_CONV).send()
+        else:
+            op = entrypoint(*parameters).with_amount(tezAmount * MUTEZ_CONV).send()
+        
+        forged_op = op.forge()
+   
         op_hash = op.hash()
         print(f"Operation Send! Hash: {op_hash}")
         
@@ -132,9 +137,7 @@ def entrypointCall(client, contractAddress, entrypointName, parameters, tezAmoun
             print(f"\n❌ TIMEOUT: The operation has not be included after {timeout} seconds.")
             print("Operation could be failed or not choosen by bakers. (check fees)")
 
-        # Per verificare, puoi leggere il nuovo valore dello storage
-        #new_storage = contract_interface.storage()
-        #print(f"Il nuovo valore nello storage è: {new_storage}")
+        op_result["weight"] = len(forged_op) // 2
         return op_result
     except Exception as e:
         print(f"Si è verificato un errore: {e}")
@@ -178,10 +181,10 @@ def entrypointAnalyse(client, contractAddress):
         
 def callInfoResult(opResult):
     #print("\n" + "="*20 + " COST ANALYZIS " + "="*20)
-    deployReport = {}
+    callReport = {}
     
     try:
-        deployReport["Hash"] = opResult["hash"]
+        callReport["Hash"] = opResult["hash"]
         content = opResult['contents'][0]
         metadata = content.get('metadata', {})
         op_result_info = metadata.get('operation_result', {})
@@ -189,25 +192,27 @@ def callInfoResult(opResult):
 
         # BakerFee
         fee_mutez = int(content.get('fee', 0))
-        deployReport["BakerFee"] = fee_mutez
+        callReport["BakerFee"] = fee_mutez
 
         # Gas
         consumed_milligas = int(op_result_info.get('consumed_milligas', 0))
-        deployReport["Gas"] = consumed_milligas
+        callReport["Gas"] = consumed_milligas
 
         # Storage Fee (Burn)
         if ('paid_storage_size_diff' in op_result_info):
             storage_size_diff = int(op_result_info.get('paid_storage_size_diff', 0))
             storage_burn_cost_mutez = storage_size_diff * 250
-            deployReport["Storage"] = storage_burn_cost_mutez
+            callReport["Storage"] = storage_burn_cost_mutez
         else:
             storage_burn_cost_mutez = 0
             
         
         total_cost_mutez = fee_mutez + storage_burn_cost_mutez
-        deployReport["TotalCost"] = total_cost_mutez
+        callReport["TotalCost"] = total_cost_mutez
         
-        return deployReport
+        callReport["Weight"] = opResult["weight"]
+        
+        return callReport
 
     except (KeyError, IndexError, TypeError) as e:
         print(f"Errore: {e}")
