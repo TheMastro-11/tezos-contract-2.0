@@ -1,6 +1,5 @@
 import smartpy as sp
 
-
 @sp.module
 def main():
     class SimpleTransfer(sp.Contract):
@@ -24,9 +23,9 @@ def main():
 def test():
     # set scenario
     sc = sp.test_scenario("SimpleTransfer", main)
-    owner = sp.test_account("owner")
-    receiver = sp.test_account("receiver")
+    owner = sp.address(input("Insert owner address: ")) #sp.test_account("owner")
+    receiver = sp.address(input("Insert receiver address")) #sp.test_account("receiver")
     # create object SimpleTransfer
-    sitr = main.SimpleTransfer(owner.address, receiver.address)
+    sitr = main.SimpleTransfer(owner, receiver)
     # start scenario
     sc += sitr

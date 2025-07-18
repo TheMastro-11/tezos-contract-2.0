@@ -38,12 +38,11 @@ def main():
 def test():
     # set scenario
     sc = sp.test_scenario("HTLC", main)
-    committer = sp.test_account("committer")
-    receiver = sp.test_account("receiver")
-    bytes = sp.pack("Hello")
+    committer = sp.address(input("Insert committer address:")) #sp.test_account("committer")
+    receiver = sp.address(input("Insert receiver address:")) #sp.test_account("receiver")
+    bytes = sp.pack(input("Insert a word to hash:"))
     hash = sp.keccak(bytes)
     # create object HashTimedLockedContract
-    htlc = main.HashTimedLockedContract(committer.address, 10, receiver.address, hash)
-    htlc.set_initial_balance(sp.mutez(10))
+    htlc = main.HashTimedLockedContract(committer, 100, receiver, hash)
     # start scenario
     sc += htlc

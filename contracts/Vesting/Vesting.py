@@ -4,10 +4,10 @@ import smartpy as sp
 def main():
     class Vesting(sp.Contract):
         # Define the contract's data
-        def __init__(self, _beneficiary, _start, _duration, _amount):
+        def __init__(self, _beneficiary, _duration, _amount):
             self.data.amount = _amount
             self.data.beneficiary = _beneficiary
-            self.data.start = _start
+            self.data.start = sp.now
             self.data.duration = _duration
             self.data.released = sp.mutez(0)
 
@@ -26,17 +26,14 @@ def main():
                 self.data.released += released
                 
             
-                
-                
-            
 @sp.add_test()
 def test():
     #set scenario
     sc = sp.test_scenario("Vesting", main)
     #create users
-    beneficiary = sp.test_account("Beneficiary")
+    beneficiary = sp.address(input("Insert beneficiary address: "))#sp.test_account("Beneficiary")
     #create object
-    c1 = main.Vesting(beneficiary.address, sp.now, 5, sp.mutez(10))
+    c1 = main.Vesting(beneficiary, 5, sp.mutez(10))
     #start scenario
     sc += c1
 
