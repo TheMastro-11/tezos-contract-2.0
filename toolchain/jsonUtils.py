@@ -34,12 +34,13 @@ def jsonWriter(fileName, opReport):
         pass
         
         
-    nextItemIndex = len(transactionsValid) +1
     item = {
+        "Entrypoint" : opReport["entryPoint"],
         "TotalCost" : opReport["TotalCost"],
+        "Weight" : opReport["Weight"],
         "Hash" : opReport["Hash"]
     }
-    transactionsValid[nextItemIndex] = item
+    transactionsValid[opReport["contract"]] = item
     
     with open(fileName, 'w', encoding='utf-8') as file:
         json.dump(transactionsValid, file, indent=4)
