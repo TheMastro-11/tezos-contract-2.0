@@ -5,3 +5,4 @@ toolchain/secretKey
 toolchain/secretKey2
 toolchain/secretKey3
 toolchain/__pycache__
+toolchain/wallet.json
