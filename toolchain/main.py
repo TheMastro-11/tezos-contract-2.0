@@ -44,7 +44,7 @@ def executionSetup(contract,rows):
         walletSel = row[1]
         tezAmount = int(row[len(row)-1])
         if row[2:len(row)-1] == []:
-            parameters = None
+            parameters = []
         else:
             parameters = row[2:len(row)-1]
          

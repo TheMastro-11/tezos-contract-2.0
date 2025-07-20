@@ -106,10 +106,17 @@ def entrypointCall(client, contractAddress, entrypointName, parameters, tezAmoun
     contract_interface = client.contract(contractAddress)
 
     print(f"\n Calling {entrypointName} entrypoint...\n")
+    
+    parametersDict = {}
+    if parameters != [] and "=" in parameters[0]:
+        for param in parameters:
+            paramSplitted = param.split("=")
+            parametersDict[paramSplitted[0]] = paramSplitted[1]
+        parameters = [parametersDict]            
 
     try:
         entrypoint = getattr(contract_interface, entrypointName)
-        if parameters == [] or parameters == None:
+        if parameters == []:
             op = entrypoint().with_amount(tezAmount * MUTEZ_CONV).send()
         else:
             op = entrypoint(*parameters).with_amount(tezAmount * MUTEZ_CONV).send()
