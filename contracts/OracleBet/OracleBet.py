@@ -16,8 +16,8 @@ def main():
             
         @sp.entrypoint
         def deposit(self, params):
-            player2 = sp.Some(params._player2)
-            oracle = sp.Some(params._oracle)
+            player2 = sp.Some(params.player2)
+            oracle = sp.Some(params.oracle)
             if self.data.player1 == None:
                 assert sp.amount == sp.tez(1), "Amount incorrect, must be 1 tez"
                 
@@ -29,13 +29,19 @@ def main():
                 self.data.player2 = player2
 
             else: 
-                assert sp.sender == self.data.player1.unwrap_some(), "You are already player 1"
+                raise "Error, entrypoint already called"
+                
+
+        @sp.entrypoint
+        def deposit2(self):
+            if self.data.player2 != None:
                 assert sp.sender == self.data.player2.unwrap_some(), "You are not player 2"
                 assert sp.amount == sp.tez(1), "Amount incorrect, must be 1 tez"
                 
                 self.data.player2 = sp.Some(sp.sender)
                 self.data.player2Deposit = True
-
+            else:
+                raise "Error, wait for player1 deposit first"
 
 
         @sp.entrypoint
@@ -53,8 +59,6 @@ def main():
             assert sp.level >= self.data.deadline, "You have to wait for deadline"
 
             self.data.winner = sp.Some(_winner)
-
-
 
 @sp.add_test()
 def test():
