@@ -10,3 +10,6 @@
 | SimpleTransfer | deposit | 317 | 96 | oo7eCxorobinNKAyms6gnwrzNr65nv8ZyuFQGFFyxP4jWXUzx63 |
 | SimpleTransfer | withdraw | 534 | 103 | opBZvHXGMKoccRAEepBuHJgsnDnMeFM2yazuDB6RVwcgEw2ZBbu |
 | Vesting | release | 533 | 102 | ooC4hX9mUL2p9xwic6tzDReLHebX6oNugL5kEMrxHQNMDcGAeyf |
+| OracleBet | deposit2 | 327 | 105 | onmoMj1vSk6cWrB8pdzHB3dB9WFmAmt7oTJvAejXT5aPhF4fW3Z |
+| OracleBet | election | 7114 | 142 | onwvPbnFk3gyZ9sn21ujQ1R5PxzAh5DicEbT6MQsqSikRzii2h7 |
+| OracleBet | withdraw | 535 | 103 | ooywuU2XSuJHpjxrgS5ej3q9SExvvLYJfafXx2JrprTXJpNCb67 |
