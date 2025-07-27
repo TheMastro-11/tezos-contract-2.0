@@ -84,3 +84,7 @@ The user starts the toolchain by running `python3 main.py` from the command line
 
     The main menu will then be displayed, guiding the user through the subsequent choices.
 
+
+## License
+
+This project is licensed under the Creative Commons Attribution 4.0 International License. To view a copy of this license, visit [creativecommons.org](http://creativecommons.org/licenses/by/4.0/) or see the `LICENSE` file.
