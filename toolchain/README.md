@@ -125,14 +125,14 @@ It is crucial to emphasize that these values represent the *minimum* costs. User
 
 **Storage and Storage Cost**: In addition to the fees calculated by the formula, a separate cost applies whenever an operation increases the amount of data permanently stored on the blockchain. This cost was drastically reduced with the "Delphi" protocol upgrade, dropping from 1 XTZ per kilobyte to 0.25 XTZ per kilobyte (equivalent to 250 µꜩ per byte). This storage cost is the most significant factor in deploying smart contracts.
 
-| Parameter | Description | Value (Post-Delphi) | Source |
+| Parameter | Description | Value (Post-Delphi) |
 | :--- | :--- | :--- | :--- |
-| $min\_F$ | Minimum base fee | 100 µꜩ | [4] |
-| $min(nꜩ/B)$ | Minimum cost per byte of operation | 250 µꜩ/B | [4] |
-| $min(nꜩ/g\_u)$ | Minimum cost per gas unit | 100 nꜩ/gu | [4] |
-| Storage Cost | Cost for increasing storage (burned) | 0.25 ꜩ/kB (250 µꜩ/B) | [6] |
-| Gas Limit/Operation | Maximum gas consumable by a single operation | 1,040,000 gu | [6] |
-| Gas Limit/Block | Maximum gas consumable by an entire block | Variable with upgrades (e.g., >10,400,000 gu post-Carthage) | [6, 10] |
+| $min\_F$ | Minimum base fee | 100 µꜩ |
+| $min(nꜩ/B)$ | Minimum cost per byte of operation | 250 µꜩ/B |
+| $min(nꜩ/g\_u)$ | Minimum cost per gas unit | 100 nꜩ/gu |
+| Storage Cost | Cost for increasing storage (burned) | 0.25 ꜩ/kB (250 µꜩ/B) |
+| Gas Limit/Operation | Maximum gas consumable by a single operation | 1,040,000 gu |
+| Gas Limit/Block | Maximum gas consumable by an entire block | Variable with upgrades (e.g., >10,400,000 gu post-Carthage) |
 
 ### Section 3: Cost Analysis for Simple Transactions
 
