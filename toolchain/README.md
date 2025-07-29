@@ -126,7 +126,7 @@ It is crucial to emphasize that these values represent the *minimum* costs. User
 **Storage and Storage Cost**: In addition to the fees calculated by the formula, a separate cost applies whenever an operation increases the amount of data permanently stored on the blockchain. This cost was drastically reduced with the "Delphi" protocol upgrade, dropping from 1 XTZ per kilobyte to 0.25 XTZ per kilobyte (equivalent to 250 µꜩ per byte). This storage cost is the most significant factor in deploying smart contracts.
 
 | Parameter | Description | Value (Post-Delphi) |
-| :--- | :--- | :--- | :--- |
+| :--- | :--- | :--- |
 | $min\_F$ | Minimum base fee | 100 µꜩ |
 | $min(nꜩ/B)$ | Minimum cost per byte of operation | 250 µꜩ/B |
 | $min(nꜩ/g\_u)$ | Minimum cost per gas unit | 100 nꜩ/gu |
