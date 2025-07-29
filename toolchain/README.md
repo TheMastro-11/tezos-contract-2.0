@@ -108,7 +108,7 @@ To fully understand the Tezos fee model, it is essential to define some fundamen
 
 The Tezos fee model is known for its predictability, based on a deterministic formula that calculates the minimum cost of a transaction. This formula, as documented by sources like [OpenTezos](https://opentezos.com/tezos-basics/economics-and-rewards/), establishes the threshold below which a baker will not accept a transaction. The formula is as follows:
 
-$$\text{Fees} \geq \text{min\_F} + (\text{min}(\text{nꜩ/B}) \times s) + (\text{min}(\text{nꜩ/g\_u}) \times g)$$
+$$\text{Fees} \geq \text{min}_F + (\text{min}(\text{nꜩ/B}) \times s) + (\text{min}(\text{nꜩ/g}_u) \times g)$$
 
 Each component of this formula has a specific role:
 * $min\_F$: This is a minimum base fee, set at 100 micro-tez (µꜩ), which covers the fixed costs associated with handling any transaction, regardless of its complexity.
