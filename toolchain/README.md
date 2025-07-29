@@ -65,6 +65,59 @@ The user starts the toolchain by running `python3 main.py` from the command line
       * The `csvUtils.csvReader` module reads files from the `execution_traces/` directory. Each CSV file contains a series of steps, where each row specifies the `entrypoint`, `wallet`, `parameters`, and `tezAmount`.
       * The `executionSetup` function iterates through these rows, simulating a sequence of real transactions and recording the results for each step. This allows for testing complex scenarios and measuring their costs in a reproducible manner.
 
+
+```mermaid
+graph TD
+    A["Start: User runs main.py"] --> B{"Main Menu (CLI)"}
+    
+    B --> C["Scan Available Contracts"]
+    B --> D["Compile Selected Contract"]
+    B --> E["Run 'Origination' (Deploy)"]
+    B --> F["Interact with Existing Contract"]
+    B --> G["Run Test from CSV Trace"]
+
+    subgraph "Setup Flow"
+        C --> C1("folderScan.py")
+        C1 --> C2["Show contract list"]
+    end
+
+    subgraph "Compilation Flow"
+        D --> D1["User selects a contract"]
+        D1 --> D2("contractUtils.py: compile")
+        D2 --> D3["Output: Michelson Code"]
+    end
+    
+    subgraph "Deploy Flow"
+        E --> E1["User selects a contract"]
+        E1 --> E2("contractUtils.py: originate")
+        E2 --> E3{"Success?"}
+        E3 -->|Yes| E4("jsonUtils.py: save address")
+        E3 -->|No| E5["Show error"]
+    end
+
+    subgraph "Interaction Flow"
+        F --> F1["User selects contract and entrypoint"]
+        F1 --> F2("contractUtils.py: call entrypoint")
+        F2 --> F3["Log transaction result"]
+    end
+
+    subgraph "Automated Test Flow"
+        G --> G1["User selects a contract"]
+        G1 --> G2("csvUtils.py: reads CSV file")
+        G2 --> G3{"Loop over CSV rows"}
+        G3 -->|"Execute transaction"| G4("contractUtils.py: run operation")
+        G4 --> G3
+        G3 -->|"End Loop"| G5("Writes CSV/MD report")
+    end
+
+    Z[End]
+    D3 --> Z
+    E4 --> Z
+    E5 --> Z
+    F3 --> Z
+    G5 --> Z
+
+```
 -----
 
 ## **4. Configuration and Usage**
