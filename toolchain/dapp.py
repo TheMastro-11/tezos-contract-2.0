@@ -14,6 +14,7 @@ from csvUtils import csvReader, csvWriter
 from jsonUtils import getAddress, addressUpdate, jsonWriter
 from pytezos import pytezos
 import json
+from main import executionSetup
 
 st.set_page_config(
     page_title="Tezos Smart Contract Toolchain",
