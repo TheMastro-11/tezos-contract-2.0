@@ -79,6 +79,9 @@ def exportResult(opResult):
     
       
 def main():
+    print("Hi, welcome to the Tezos-Contract toolchain!\n")
+    print("Here you can compile, deploy or interact with any contract from the archive.\n")
+    
     stdPath = "../contracts/"
     operationSel = int(input("Now, select an option: \n"
         "1 Compile\n" 
@@ -139,12 +142,6 @@ def main():
             
             main()
             
-
-if __name__ in "__main__":
-    print("Hi, welcome to the Tezos-Contract toolchain!\n")
-    print("Here you can compile, deploy or interact with any contract from the archive.\n")
-    
-    main()
     
     
         

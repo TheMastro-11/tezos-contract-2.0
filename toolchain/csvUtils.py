@@ -10,12 +10,11 @@ def csvReader():
             rows = {}
             
             with open(fileName, mode='r', newline='', encoding='utf-8') as file_csv:
-                csv_read = csv.reader(file_csv)
+                csv_read = csv.reader(file_csv, delimiter = ",")
 
                 i = 0
                 for row in csv_read:
-                    newRow = row[0].split(";")
-                    rows[newRow.pop(0)] = newRow
+                    rows[row.pop(0)] = row
                     i += 1
                     
             executionTracesDict[trace.replace(".csv","")] = rows
