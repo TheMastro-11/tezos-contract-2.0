@@ -190,13 +190,13 @@ Documentation:
 
 # 4. Comparative Summary
 
-  Dimension           Legacy SmartPy        Modern SmartPy
-  ------------------- --------------------- ----------------------
-  Typing              Michelson-mirroring   Python-integrated
-  Control Flow        DSL-specific          Native Python
-  Storage             `self.init()`         `self.data`
-  Optional Handling   Explicit              Reduced
-  Modularity          Limited               Strong module system
+  | Dimension           | Legacy SmartPy        | Modern SmartPy
+  | - | - | - |
+  | Typing              | Michelson-mirroring   | Python-integrated
+  | Control Flow        | DSL-specific          | Native Python
+  | Storage             | `self.init()`         | `self.data`
+  | Optional Handling   | Explicit              | Reduced
+  | Modularity          | Limited               | Strong module system
 
 ------------------------------------------------------------------------
 

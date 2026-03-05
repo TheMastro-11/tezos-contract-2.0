@@ -141,13 +141,13 @@ Moderno:
 
 # 4. Sintesi Comparativa
 
-  Dimensione            SmartPy Legacy         SmartPy Moderno
-  --------------------- ---------------------- ------------------------
-  Tipizzazione          Ricalco di Michelson   Integrata con Python
-  Flusso di controllo   DSL specifica          Python nativo
-  Storage               `self.init()`          `self.data`
-  Gestione opzionali    Esplicita              Ridotta
-  Modularità            Limitata               Forte sistema a moduli
+  | Dimensione            | SmartPy Legacy         | SmartPy Moderno
+  | - | - | - |
+  | Tipizzazione          | Ricalco di Michelson   | Integrata con Python
+  | Flusso di controllo   | DSL specifica          | Python nativo
+  | Storage               | `self.init()`          | `self.data`
+  | Gestione opzionali    | Esplicita              | Ridotta
+  | Modularità            | Limitata               | Forte sistema a moduli
 
 ------------------------------------------------------------------------
 
