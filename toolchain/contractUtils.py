@@ -1,4 +1,5 @@
 from pytezos import pytezos
+from pathlib import Path
 import traceback
 from pytezos.michelson.parse import michelson_to_micheline
 import time
@@ -7,20 +8,38 @@ import sys
 
 MUTEZ_CONV = 1000000
 ##Compiler
-def compileContract(contractPath) :
+def compileContract(contractPath):
     print(f">>> Compiling '{contractPath}'...")
 
+    if not Path(contractPath).is_file():
+        raise FileNotFoundError(f"'{contractPath}' not found.")
+
     try:
-        subprocess.run([sys.executable, contractPath], check=True)
+        result = subprocess.run(
+            [sys.executable, contractPath],
+            check=True,
+            capture_output=True,
+            text=True
+        )
+        if result.stdout:
+            print(result.stdout)
 
-        print(f"\n>>> '{contractPath}' compiled!")
+        print(f">>> '{contractPath}' compiled!")
+        return result
 
-    except FileNotFoundError:
-        print(f"ERROR: '{contractPath}' not found.")
-    except subprocess.CalledProcessError:
-        print(f"\nERROR: '{contractPath}' raise an exception.")
+    except subprocess.CalledProcessError as e:
+        if e.stdout:
+            print(e.stdout)
+        if e.stderr:
+            print(e.stderr)
+
+        details = (e.stderr or e.stdout or '').strip()
+        if details:
+            raise RuntimeError(f"Compilation failed for '{contractPath}':\n{details}") from e
+        raise RuntimeError(f"Compilation failed for '{contractPath}'.") from e
 
 ##Deploy
+
 def origination(client, michelsonCode, initialStorage, initialBalance):
 
     parsed_code = michelson_to_micheline(michelsonCode)

@@ -14,8 +14,7 @@ from csvUtils import csvReader, csvWriter
 from jsonUtils import getAddress, addressUpdate, jsonWriter
 from pytezos import pytezos
 import json
-from main import executionSetup
-
+from main import executionSetupCsv, executionSetupJson
 st.set_page_config(
     page_title="Tezos Smart Contract Toolchain",
     layout="centered"
@@ -40,6 +39,39 @@ def get_client(wallet_id):
         st.error(f"Error during client configuration: {e}")
         return None
 
+
+
+def parse_contract_id(contract_id: str) -> tuple[str, str]:
+    """Return (folder, implementation) from either 'Folder:Impl' or legacy 'Folder'."""
+    if ":" in contract_id:
+        folder, impl = contract_id.split(":", 1)
+        return folder, impl
+    return contract_id, contract_id
+
+def resolve_compiled_paths(folder: str, impl: str) -> tuple[Path, Path]:
+    """Return (contract.tz, storage.tz) paths, trying impl folder then legacy folder."""
+    # SmartPy output folder naming can vary; the toolchain historically uses a folder with the contract name.
+    candidates = [
+        Path(f"./{impl}/step_001_cont_0_contract.tz"),
+        Path(f"./{folder}/step_001_cont_0_contract.tz"),
+    ]
+    storage_candidates = [
+        Path(f"./{impl}/step_001_cont_0_storage.tz"),
+        Path(f"./{folder}/step_001_cont_0_storage.tz"),
+    ]
+    for c, s in zip(candidates, storage_candidates):
+        if c.exists() and s.exists():
+            return c, s
+    # fallback to first pair (for error messaging)
+    return candidates[0], storage_candidates[0]
+
+def execution_setup_auto(contract: str, rows):
+    """Route execution traces (CSV dict or JSON-like) to the right executor."""
+    # Existing traces in this repo are CSV; keep JSON support for completeness.
+    if isinstance(rows, dict):
+        return executionSetupCsv(contract=contract, rows=rows)
+    return executionSetupJson(contract=contract, rows=rows)
+
 def compile_view(client):
     st.header("1. Compile SmartPy Contracts")
     contracts = folderScan("../contracts")
@@ -47,14 +79,16 @@ def compile_view(client):
 
     if st.button("🚀 Compile"):
         if contract_to_compile and client:
-            contract_path = f"../contracts/{contract_to_compile}/{contract_to_compile}.py"
+            folder, impl = parse_contract_id(contract_to_compile)
+            contract_path = f"../contracts/{folder}/{impl}.py"
             with st.spinner(f"Compiling {contract_path}..."):
                 try:
                     compileContract(contractPath=contract_path)
                     st.success(f"Contract '{contract_to_compile}' compiled successfully!")
                     st.info("The Michelson files have been generated in the contract's directory.")
                 except Exception as e:
-                    st.error(f"Error during compilation: {e}")
+                    st.error("Error during compilation")
+                    st.code(str(e))
 
 def deploy_view(client):
     st.header("2. Deploy a Contract (Origination)")
@@ -65,15 +99,15 @@ def deploy_view(client):
 
     if st.button("🌐 Deploy"):
         if contract_to_deploy and client:
-            michelson_path_str = f"./{contract_to_deploy}/step_001_cont_0_contract.tz"
-            storage_path_str = f"./{contract_to_deploy}/step_001_cont_0_storage.tz"
+            folder, impl = parse_contract_id(contract_to_deploy)
+            michelson_path, storage_path = resolve_compiled_paths(folder, impl)
 
-            if not Path(michelson_path_str).exists() or not Path(storage_path_str).exists():
+            if not michelson_path.exists() or not storage_path.exists():
                 st.error("Contract not compiled. Compile it before deploying.")
                 return
 
-            michelson_code = Path(michelson_path_str).read_text()
-            storage_code = Path(storage_path_str).read_text()
+            michelson_code = michelson_path.read_text()
+            storage_code = storage_path.read_text()
 
             with st.spinner("Origination in progress... The operation may take a few minutes."):
                 try:
@@ -165,7 +199,7 @@ def trace_view():
                 all_results = {}
                 for contract, rows in execution_traces.items():
                     st.write(f"--- Executing trace for **{contract}** ---")
-                    results = executionSetup(contract=contract, rows=rows)
+                    results = execution_setup_auto(contract=contract, rows=rows)
                     all_results[contract] = results
                     for element, result in results.items():
                         st.write(f"Step `{element}` completed.")
