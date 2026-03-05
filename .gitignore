@@ -6,3 +6,8 @@ toolchain/secretKey2
 toolchain/secretKey3
 toolchain/__pycache__
 toolchain/wallet.json
+toolchain/transactionsOutput.csv
+toolchain/transactionsOutput.json
+
+contracts/addressList.json
+contracts/pubKeyAddr.json
