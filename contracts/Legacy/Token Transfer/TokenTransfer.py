@@ -1,6 +1,9 @@
 import smartpy as sp
 from smartpy.templates import fa2_lib as fa2
 
+main = fa2.main
+t = fa2.t
+
 @sp.module
 #Type Definition
 def types():
