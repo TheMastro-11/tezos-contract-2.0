@@ -21,16 +21,6 @@ def getAddress():
     return addressValid
 
 def resolveAddress(addressValid, contractId):
-    """Resolve a contract address given an identifier.
-
-    Supports both:
-      - New identifiers: '<Folder>:<FileBase>' (e.g. 'Auction:AuctionRosetta')
-      - Legacy identifiers: '<Folder>' (e.g. 'Auction')
-
-    Resolution order:
-      1) Exact match on contractId
-      2) If contractId contains ':', try the folder part as legacy key
-    """
     if contractId in addressValid:
         return addressValid[contractId]
 
@@ -38,6 +28,9 @@ def resolveAddress(addressValid, contractId):
         folder = contractId.split(':', 1)[0]
         if folder in addressValid:
             return addressValid[folder]
+        legacy_folder = Path(folder).name
+        if legacy_folder in addressValid:
+            return addressValid[legacy_folder]
 
     raise KeyError(f"Address not found for '{contractId}'")
 

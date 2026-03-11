@@ -42,32 +42,29 @@ def get_client(wallet_id):
 
 
 def parse_contract_id(contract_id: str) -> tuple[str, str]:
-    """Return (folder, implementation) from either 'Folder:Impl' or legacy 'Folder'."""
     if ":" in contract_id:
         folder, impl = contract_id.split(":", 1)
         return folder, impl
     return contract_id, contract_id
 
 def resolve_compiled_paths(folder: str, impl: str) -> tuple[Path, Path]:
-    """Return (contract.tz, storage.tz) paths, trying impl folder then legacy folder."""
-    # SmartPy output folder naming can vary; the toolchain historically uses a folder with the contract name.
-    candidates = [
-        Path(f"./{impl}/step_001_cont_0_contract.tz"),
-        Path(f"./{folder}/step_001_cont_0_contract.tz"),
+    folder_name = Path(folder).name
+    candidate_dirs = [
+        Path(f"./{impl}"),
+        Path(f"./{folder_name}"),
+        Path(f"./{folder}"),
     ]
-    storage_candidates = [
-        Path(f"./{impl}/step_001_cont_0_storage.tz"),
-        Path(f"./{folder}/step_001_cont_0_storage.tz"),
-    ]
-    for c, s in zip(candidates, storage_candidates):
+    for base_dir in candidate_dirs:
+        c = base_dir / "step_001_cont_0_contract.tz"
+        s = base_dir / "step_001_cont_0_storage.tz"
         if c.exists() and s.exists():
             return c, s
-    # fallback to first pair (for error messaging)
-    return candidates[0], storage_candidates[0]
+    return (
+        candidate_dirs[0] / "step_001_cont_0_contract.tz",
+        candidate_dirs[0] / "step_001_cont_0_storage.tz",
+    )
 
 def execution_setup_auto(contract: str, rows):
-    """Route execution traces (CSV dict or JSON-like) to the right executor."""
-    # Existing traces in this repo are CSV; keep JSON support for completeness.
     if isinstance(rows, dict):
         return executionSetupCsv(contract=contract, rows=rows)
     return executionSetupJson(contract=contract, rows=rows)

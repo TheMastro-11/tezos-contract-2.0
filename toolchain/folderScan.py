@@ -1,38 +1,33 @@
 from pathlib import Path
 
 def folderScan(path):
-    """Return a list of contract targets found in the given contracts directory.
+    base_path = Path(path)
 
-    Each returned item is a string identifier in the form:
-        <ContractFolder>:<PythonFileBaseName>
+    if base_path.name != "contracts":
+        return sorted(
+            entry.name
+            for entry in base_path.iterdir()
+            if entry.is_file() and not entry.name.startswith('.')
+        )
 
-    This keeps backward compatibility with the previous behavior (folder names only),
-    while allowing multiple implementations per contract folder (e.g. *Rosetta.py).
+    targets = set()
+    skip_dirs = {"__pycache__", "Library"}
 
-    The returned list is sorted for stable UX.
-    """
-    contracts_path = Path(path)
+    for py_file in base_path.rglob("*.py"):
+        relative_parent = py_file.parent.relative_to(base_path)
+        parts = relative_parent.parts
 
-    targets = []
-    for entry in contracts_path.iterdir():
-        if not entry.is_dir():
+        if not parts:
             continue
 
-        folder_name = entry.name
-
-        # Skip hidden/system folders
-        if folder_name.startswith('.'):
+        if any(part.startswith('.') or part in skip_dirs for part in parts):
             continue
 
-        # Add each top-level .py file as a selectable target
-        for py_file in sorted(entry.glob('*.py')):
-            file_base = py_file.stem
-            if file_base.startswith('.'):
-                continue
-            targets.append(f"{folder_name}:{file_base}")
+        if parts[0] in {"Legacy", "Rosetta"} and len(parts) >= 2:
+            contract_folder = Path(*parts[:2]).as_posix()
+        else:
+            contract_folder = relative_parent.as_posix()
 
-        # Backward compatibility: if no .py files are found, keep folder name
-        if not any(entry.glob('*.py')):
-            targets.append(folder_name)
+        targets.add(f"{contract_folder}:{py_file.stem}")
 
     return sorted(targets)

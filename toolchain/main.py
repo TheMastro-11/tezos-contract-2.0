@@ -6,25 +6,17 @@ from pathlib import Path
 import json
 
 def parseContractId(contractId):
-    """Parse '<Folder>:<FileBase>' identifiers.
-
-    If contractId has no ':', it is treated as legacy folder name and
-    returns (contractId, contractId).
-    """
     if ':' in contractId:
         folder, file_base = contractId.split(':', 1)
         return folder, file_base
     return contractId, contractId
 
 def compiledOutputDir(contractFolder, fileBase):
-    """Return the folder name where SmartPy compilation output is expected.
-
-    The previous toolchain assumed './<ContractFolder>/'.
-    With multiple implementations per folder, we first try './<FileBase>/' and
-    fallback to './<ContractFolder>/'.
-    """
     if Path(f"./{fileBase}").exists():
         return fileBase
+    folder_name = Path(contractFolder).name
+    if Path(f"./{folder_name}").exists():
+        return folder_name
     return contractFolder
 
 def interactionSetup(client, contractId):
