@@ -9,5 +9,6 @@ toolchain/wallet.json
 toolchain/transactionsOutput.csv
 toolchain/transactionsOutput.json
 
+__pycache__
 contracts/addressList.json
 contracts/pubKeyAddr.json
