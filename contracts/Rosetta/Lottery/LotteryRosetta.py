@@ -12,77 +12,77 @@ def main():
         End=sp.unit)
     
     class LotteryRosetta(sp.Contract):
-        def __init__(self, owner):
-            self.data.owner = sp.cast(owner, sp.address)
-            self.data.player0 = sp.cast(None, sp.address)
-            self.data.player1 = sp.cast(None, sp.address)
-            self.data.winner = sp.cast(None, sp.address)
-            self.data.hash0 = sp.cast(None, sp.bytes)
-            self.data.hash1 = sp.cast(None, sp.bytes)
+        def __init__(self, owner: sp.address):
+            self.data.owner = owner
+            self.data.player0 = sp.cast(None, sp.option[sp.address])
+            self.data.player1 = sp.cast(None, sp.option[sp.address])
+            self.data.winner = sp.cast(None, sp.option[sp.address])
+            self.data.hash0 = sp.cast(None, sp.option[sp.bytes])
+            self.data.hash1 = sp.cast(None, sp.option[sp.bytes])
             self.data.secret0 = ""
             self.data.secret1 = ""
             self.data.bet_amount = sp.mutez(0)
             self.data.end_join = sp.level + sp.nat(1000)
             self.data.end_reveal = sp.level + sp.nat(1000)
-            self.data.status = status.Join0
+            self.data.status = sp.cast(sp.variant.Join0(), status)
             
         @sp.entrypoint
         def join0(self, h):
-            assert self.data.status == status.Join0 and sp.amount > sp.mutez(0), "Status not join0 or wrong amount"
+            assert self.data.status == sp.cast(sp.variant.Join0(), status) and sp.amount > sp.mutez(0), "Status not join0 or wrong amount"
             
-            self.data.player0 = sp.sender
-            self.data.hash0 = h
-            self.data.status = status.Join1
+            self.data.player0 = sp.Some(sp.sender)
+            self.data.hash0 = sp.Some(h)
+            self.data.status = sp.cast(sp.variant.Join1(), status)
             self.data.bet_amount = sp.amount
         
         @sp.entrypoint
         def join1(self, h):
-            assert self.data.status == status.Join1 and h!=self.data.hash and sp.amount == self.data.bet_amount, "Status not join1 or same hash or wrong amount"
+            assert self.data.status == sp.cast(sp.variant.Join1(), status) and h!=self.data.hash0.unwrap_some() and sp.amount == self.data.bet_amount, "Status not join1 or same hash or wrong amount"
             
-            self.data.player1 = sp.sender
-            self.data.hash1 = h
-            self.data.status = status.Reveal0
+            self.data.player1 = sp.Some(sp.sender)
+            self.data.hash1 = sp.Some(h)
+            self.data.status = sp.cast(sp.variant.Reveal0(), status)
         
         @sp.entrypoint
         def redeem0_nojoin1(self):
-            assert self.data.status == status.Join1 and sp.level > self.data.end_join, "Status not join1 or block level not over end join"
+            assert self.data.status == sp.cast(sp.variant.Join1(), status) and sp.level > self.data.end_join, "Status not join1 or block level not over end join"
             
-            sp.send(self.data.player0, sp.balance)
-            self.data.status = status.End
+            sp.send(self.data.player0.unwrap_some(), sp.balance)
+            self.data.status = sp.cast(sp.variant.End(), status)
             
         @sp.entrypoint
         def reveal0(self, s):
-            assert self.data.status == status.Reveal0 and sp.sender == self.data.player0, "Status not reveal0 or sender not player0"
-            assert self.data.hash0 == sp.keccak(sp.pack(s))
+            assert self.data.status == sp.cast(sp.variant.Reveal0(), status) and sp.sender == self.data.player0.unwrap_some(), "Status not reveal0 or sender not player0"
+            assert self.data.hash0.unwrap_some() == sp.keccak(sp.pack(s))
 
             self.data.secret0 = s
-            self.data.status = status.Reveal1
+            self.data.status = sp.cast(sp.variant.Reveal1(), status)
         
         @sp.entrypoint
         def redeem1_noreveal0(self):
-            assert self.data.status == status.Reveal0 and sp.level > self.data.end_reveal, "Status not reveal0 or block level not over deadline"
+            assert self.data.status == sp.cast(sp.variant.Reveal0(), status) and sp.level > self.data.end_reveal, "Status not reveal0 or block level not over deadline"
             
-            sp.send(self.data.player1, sp.balance)
-            self.data.status = status.End
+            sp.send(self.data.player1.unwrap_some(), sp.balance)
+            self.data.status = sp.cast(sp.variant.End(), status)
         
         @sp.entrypoint 
         def reveal1(self, s):
-            assert self.data.status == status.Reveal1 and sp.sender == self.data.player1, "Status not reveal1 or sender not player1"
-            assert self.data.hash1 == sp.keccak(sp.pack(s))
+            assert self.data.status == sp.cast(sp.variant.Reveal1(), status) and sp.sender == self.data.player1.unwrap_some(), "Status not reveal1 or sender not player1"
+            assert self.data.hash1.unwrap_some() == sp.keccak(sp.pack(s))
             
             self.data.secret1 = s
-            self.data.status = status.Win
+            self.data.status = sp.cast(sp.variant.Win(), status)
         
         @sp.entrypoint
         def redeem0_noreveal1(self):
-            assert self.data.status == status.Reveal1 and sp.level > self.data.end_reveal, "Status not reveal1 or block level not over deadline"
+            assert self.data.status == sp.cast(sp.variant.Reveal1(), status) and sp.level > self.data.end_reveal, "Status not reveal1 or block level not over deadline"
             
-            sp.send(self.data.player0, sp.balance)
-            self.data.status = status.End
+            sp.send(self.data.player0.unwrap_some(), sp.balance)
+            self.data.status = sp.cast(sp.variant.End(), status)
         
         @sp.entrypoint
         def win(self):
-            assert self.data.status == status.Win, "not status Win"
+            assert self.data.status == sp.cast(sp.variant.Win(), status), "not status Win"
             
             l0 = sp.cast(len(self.data.secret0), sp.nat)
             l1 = sp.cast(len(self.data.secret1), sp.nat)
@@ -92,16 +92,44 @@ def main():
             else:
                 self.data.winner = self.data.player1
                 
-            sp.send(self.data.winner, sp.balance)
+            sp.send(self.data.winner.unwrap_some(), sp.balance)
             
-            self.data.status = status.END
+            self.data.status = sp.cast(sp.variant.End(), status)
             
-sp.add_test()
+@sp.add_test()
 def test():
-    # set scenario
     sc = sp.test_scenario("LotteryRosetta", main)
-    owner = sp.address("tz1SL2xBdmLSD2W3Hs84SfH912xDpYtAjsaa")
-    c1 = main.LotteryRosetta(owner)
-    sc += c1
-    
-    
+
+    owner = sp.test_account("owner")
+    player0 = sp.test_account("player0")
+    player1 = sp.test_account("player1")
+
+    secret0 = "alpha"
+    hash0 = sp.keccak(sp.pack(secret0))
+    bet_amount = sp.mutez(1_000_000)
+
+    lottery = main.LotteryRosetta(owner.address)
+    sc += lottery
+
+    sc.verify(lottery.data.owner == owner.address)
+    sc.verify(lottery.data.bet_amount == sp.mutez(0))
+    sc.verify(lottery.data.secret0 == "")
+    sc.verify(lottery.data.secret1 == "")
+    sc.verify(lottery.balance == sp.mutez(0))
+
+    lottery.join0(hash0, _sender=player0.address, _amount=sp.mutez(0), _valid=False)
+    lottery.redeem0_nojoin1(_sender=player0.address, _level=999, _valid=False)
+
+    lottery.join0(hash0, _sender=player0.address, _amount=bet_amount, _level=1)
+
+    sc.verify(lottery.data.player0.unwrap_some() == player0.address)
+    sc.verify(lottery.data.hash0.unwrap_some() == hash0)
+    sc.verify(lottery.data.bet_amount == bet_amount)
+    sc.verify(lottery.balance == bet_amount)
+
+    lottery.join0(hash0, _sender=player1.address, _amount=bet_amount, _level=2, _valid=False)
+    lottery.redeem0_nojoin1(_sender=player0.address, _level=1000, _valid=False)
+    lottery.redeem0_nojoin1(_sender=player0.address, _level=1001)
+
+    sc.verify(lottery.balance == sp.mutez(0))
+    sc.verify(lottery.data.status == sp.variant.End(sp.unit))
