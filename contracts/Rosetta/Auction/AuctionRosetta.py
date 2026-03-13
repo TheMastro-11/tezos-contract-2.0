@@ -31,7 +31,7 @@ def main():
             
             assert sp.amount > self.data.highest_bid, "value must be greater than highest"
 
-            if (self.data.highest_bidder != sp.Some(sp.sender)):
+            if (self.data.highest_bidder.is_some()):
                 self.data.bids[self.data.highest_bidder.unwrap_some()] = self.data.highest_bid
 
             if (self.data.bids[sp.sender] != sp.mutez(0)):
