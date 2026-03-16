@@ -1,7 +1,17 @@
 from pathlib import Path
 
+def normalizeRoot(path):
+    return Path(path).expanduser().resolve()
+
 def folderScan(path):
-    base_path = Path(path)
+    base_path = normalizeRoot(path)
+
+    if base_path.name == "scenarios":
+        return sorted(
+            entry.stem
+            for entry in base_path.iterdir()
+            if entry.is_file() and entry.suffix == ".py" and not entry.name.startswith('.')
+        )
 
     if base_path.name != "contracts":
         return sorted(
@@ -11,7 +21,7 @@ def folderScan(path):
         )
 
     targets = set()
-    skip_dirs = {"__pycache__", "Library"}
+    skip_dirs = {"__pycache__", "Library", "scenarios"}
 
     for py_file in base_path.rglob("*.py"):
         relative_parent = py_file.parent.relative_to(base_path)
@@ -31,3 +41,6 @@ def folderScan(path):
         targets.add(f"{contract_folder}:{py_file.stem}")
 
     return sorted(targets)
+
+def scenarioScan(path):
+    return folderScan(path)

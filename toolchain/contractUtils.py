@@ -38,6 +38,34 @@ def compileContract(contractPath):
             raise RuntimeError(f"Compilation failed for '{contractPath}':\n{details}") from e
         raise RuntimeError(f"Compilation failed for '{contractPath}'.") from e
 
+
+
+def runScenario(scenarioPath):
+    scenario_path = Path(scenarioPath)
+
+    if not scenario_path.is_file():
+        raise FileNotFoundError(f"'{scenarioPath}' not found.")
+
+    try:
+        result = subprocess.run(
+            [sys.executable, str(scenario_path)],
+            cwd=str(scenario_path.parent),
+            check=True,
+            capture_output=True,
+            text=True
+        )
+        return result
+    except subprocess.CalledProcessError as e:
+        details = []
+        if e.stdout:
+            details.append(e.stdout.strip())
+        if e.stderr:
+            details.append(e.stderr.strip())
+        message = "\n\n".join(part for part in details if part)
+        if message:
+            raise RuntimeError(f"Scenario execution failed for '{scenarioPath}':\n{message}") from e
+        raise RuntimeError(f"Scenario execution failed for '{scenarioPath}'.") from e
+
 ##Deploy
 
 def origination(client, michelsonCode, initialStorage, initialBalance):

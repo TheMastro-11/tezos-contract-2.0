@@ -7,9 +7,10 @@ from contractUtils import (
     contractInfoResult,
     entrypointAnalyse,
     entrypointCall,
-    callInfoResult
+    callInfoResult,
+    runScenario
 )
-from folderScan import folderScan
+from folderScan import folderScan, scenarioScan
 from csvUtils import csvReader, csvWriter
 from jsonUtils import getAddress, addressUpdate, jsonWriter
 from pytezos import pytezos
@@ -21,7 +22,24 @@ st.set_page_config(
 )
 
 st.title("🏗️ Tezos Smart Contract Toolchain")
-st.caption("An interface to compile, deploy, and interact with Tezos smart contracts.")
+st.caption("An interface to compile, deploy, interact with, and test Tezos smart contracts.")
+
+TOOLCHAIN_ROOT = Path(__file__).resolve().parent
+PROJECT_ROOT = TOOLCHAIN_ROOT.parent
+
+def get_contracts_root() -> Path:
+    candidates = [
+        PROJECT_ROOT / "contracts",
+        TOOLCHAIN_ROOT / "contracts",
+        (TOOLCHAIN_ROOT / "../contracts").resolve(),
+    ]
+    for candidate in candidates:
+        if candidate.exists():
+            return candidate.resolve()
+    return candidates[0]
+
+def get_rosetta_scenarios_root() -> Path:
+    return get_contracts_root() / "Rosetta" / "scenarios"
 
 def get_client(wallet_id):
     try:
@@ -38,8 +56,6 @@ def get_client(wallet_id):
     except Exception as e:
         st.error(f"Error during client configuration: {e}")
         return None
-
-
 
 def parse_contract_id(contract_id: str) -> tuple[str, str]:
     if ":" in contract_id:
@@ -66,21 +82,21 @@ def resolve_compiled_paths(folder: str, impl: str) -> tuple[Path, Path]:
 
 def execution_setup_auto(contract: str, rows):
     if isinstance(rows, dict):
-        return executionSetupCsv(contract=contract, rows=rows)
-    return executionSetupJson(contract=contract, rows=rows)
+        return executionSetupCsv(contractId=contract, rows=rows)
+    return executionSetupJson(contractId=contract, rows=rows)
 
 def compile_view(client):
     st.header("1. Compile SmartPy Contracts")
-    contracts = folderScan("../contracts")
+    contracts = folderScan(get_contracts_root())
     contract_to_compile = st.selectbox("Select a contract to compile:", options=contracts, key="compile_select")
 
     if st.button("🚀 Compile"):
         if contract_to_compile and client:
             folder, impl = parse_contract_id(contract_to_compile)
-            contract_path = f"../contracts/{folder}/{impl}.py"
+            contract_path = get_contracts_root() / folder / f"{impl}.py"
             with st.spinner(f"Compiling {contract_path}..."):
                 try:
-                    compileContract(contractPath=contract_path)
+                    compileContract(contractPath=str(contract_path))
                     st.success(f"Contract '{contract_to_compile}' compiled successfully!")
                     st.info("The Michelson files have been generated in the contract's directory.")
                 except Exception as e:
@@ -89,7 +105,7 @@ def compile_view(client):
 
 def deploy_view(client):
     st.header("2. Deploy a Contract (Origination)")
-    contracts = folderScan("../contracts")
+    contracts = folderScan(get_contracts_root())
     contract_to_deploy = st.selectbox("Select a contract to deploy:", options=contracts, key="deploy_select")
 
     initial_balance = st.number_input("Initial balance (in tez):", min_value=0, value=1, step=1)
@@ -208,6 +224,39 @@ def trace_view():
         except Exception as e:
             st.error(f"Error during trace execution: {e}")
 
+def scenario_view():
+    st.header("5. Test Scenario")
+    scenarios_root = get_rosetta_scenarios_root()
+
+    if not scenarios_root.exists():
+        st.error(f"Scenario folder not found: {scenarios_root}")
+        return
+
+    scenarios = scenarioScan(scenarios_root)
+    if not scenarios:
+        st.warning("No scenario files found in `contracts/Rosetta/scenarios`.")
+        return
+
+    selected_scenario = st.selectbox("Select a scenario to test:", options=scenarios, key="scenario_select")
+    scenario_path = scenarios_root / f"{selected_scenario}.py"
+    st.caption(f"Resolved path: {scenario_path}")
+
+    if st.button("🧪 Run Scenario"):
+        with st.spinner(f"Running {selected_scenario}..."):
+            try:
+                result = runScenario(str(scenario_path))
+                st.success(f"Scenario '{selected_scenario}' executed successfully!")
+                if result.stdout.strip():
+                    st.code(result.stdout, language="text")
+                else:
+                    st.info("Scenario executed without console output.")
+                if result.stderr.strip():
+                    st.warning("Scenario stderr output")
+                    st.code(result.stderr, language="text")
+            except Exception as e:
+                st.error("Error during scenario execution")
+                st.code(str(e), language="text")
+
 def exportResult(opResult):
     fileName = "transactionsOutput"
     csvWriter(fileName=fileName+".csv", op_result=opResult)
@@ -220,12 +269,12 @@ wallet_selection = st.sidebar.selectbox("Select an Account (from wallet.json):",
 st.sidebar.header("Features")
 operation = st.sidebar.radio(
     "Select an operation:",
-    ("Compile", "Deploy", "Interact", "Execute Trace")
+    ("Compile", "Deploy", "Interact", "Execute Trace", "Test Scenario")
 )
 
 client = get_client(wallet_selection)
 
-if client or operation == "Execute Trace":
+if client or operation in {"Execute Trace", "Test Scenario"}:
     if operation == "Compile":
         compile_view(client)
     elif operation == "Deploy":
@@ -234,5 +283,7 @@ if client or operation == "Execute Trace":
         interact_view(client)
     elif operation == "Execute Trace":
         trace_view()
+    elif operation == "Test Scenario":
+        scenario_view()
 else:
     st.error("Cannot proceed without a valid Tezos client. Check the wallet selection and the `wallet.json` file.")

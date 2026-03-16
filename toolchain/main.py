@@ -5,6 +5,23 @@ from jsonUtils import *
 from pathlib import Path
 import json
 
+TOOLCHAIN_ROOT = Path(__file__).resolve().parent
+PROJECT_ROOT = TOOLCHAIN_ROOT.parent
+
+def getContractsRoot():
+    candidates = [
+        PROJECT_ROOT / "contracts",
+        TOOLCHAIN_ROOT / "contracts",
+        (TOOLCHAIN_ROOT / "../contracts").resolve(),
+    ]
+    for candidate in candidates:
+        if candidate.exists():
+            return candidate.resolve()
+    return candidates[0]
+
+def getScenariosRoot():
+    return getContractsRoot() / "Rosetta" / "scenarios"
+
 def parseContractId(contractId):
     if ':' in contractId:
         folder, file_base = contractId.split(':', 1)
@@ -131,6 +148,25 @@ def executionSetupJson(contractId, rows):
 
     return infoResultDict
 
+def scenarioSetup():
+    scenariosRoot = getScenariosRoot()
+    if not scenariosRoot.exists():
+        raise FileNotFoundError(f"Scenario folder not found: {scenariosRoot}")
+
+    scenarios = scenarioScan(scenariosRoot)
+    if not scenarios:
+        raise FileNotFoundError("No scenario files found.")
+
+    print("\nScenarios available:\n")
+    i = 1
+    for scenario in scenarios:
+        print(i, " " + scenario)
+        i += 1
+
+    scenarioSel = int(input("Which scenario do you want to test?\n"))
+    scenarioPath = scenariosRoot / f"{scenarios[scenarioSel-1]}.py"
+    return runScenario(str(scenarioPath))
+
 def exportResult(opResult):
     fileName = "transactionsOutput"
     csvWriter(fileName=fileName+".csv", op_result=opResult)
@@ -140,18 +176,19 @@ def exportResult(opResult):
 
 def main():
     print("Hi, welcome to the Tezos-Contract toolchain!\n")
-    print("Here you can compile, deploy or interact with any contract from the archive.\n")
+    print("Here you can compile, deploy, interact with, or test any contract from the archive.\n")
 
-    stdPath = "../contracts/"
+    contractsRoot = getContractsRoot()
     operationSel = int(input(
         "Now, select an option: \n"
         "1 Compile\n"
         "2 Deploy\n"
         "3 Interact\n"
         "4 Use Execution Trace\n"
+        "5 Test Scenario\n"
     ))
 
-    if operationSel != 4:
+    if operationSel not in {4, 5}:
         walletSel = input("Which account do you want to use?\n")
         with open("wallet.json", 'r', encoding='utf-8') as file:
             wallet = json.load(file)
@@ -159,7 +196,7 @@ def main():
         key = wallet[walletSel]
         client = pytezos.using(shell="ghostnet", key=key)
 
-        allContracts = folderScan("../contracts")
+        allContracts = folderScan(contractsRoot)
         print("\nContracts available (Folder:Implementation): \n")
         i = 1
         for contractId in allContracts:
@@ -172,9 +209,9 @@ def main():
 
     match operationSel:
         case 1:
-            contractPath = stdPath + contractFolder + "/" + fileBase + ".py"
+            contractPath = contractsRoot / contractFolder / f"{fileBase}.py"
             try:
-                compileContract(contractPath=contractPath)
+                compileContract(contractPath=str(contractPath))
             except Exception as e:
                 print(f"\nERROR: {e}\n")
             main()
@@ -218,3 +255,18 @@ def main():
                     exportResult(results[result])
 
             main()
+
+        case 5:
+            try:
+                result = scenarioSetup()
+                print("\nScenario executed successfully.\n")
+                if result.stdout:
+                    print(result.stdout)
+                if result.stderr:
+                    print(result.stderr)
+            except Exception as e:
+                print(f"\nERROR: {e}\n")
+            main()
+
+if __name__ == "__main__":
+    main()
