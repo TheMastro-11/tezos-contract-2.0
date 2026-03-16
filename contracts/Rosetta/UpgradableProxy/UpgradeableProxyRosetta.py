@@ -51,3 +51,17 @@ def scenario_helpers():
         @sp.entrypoint
         def check(self, to_check: sp.mutez):
             assert to_check >= self.data.threshold
+
+@sp.add_test()
+def testProxy():
+    sc = sp.test_scenario("UpgradableProxy", [main, scenario_helpers])
+    admin = sp.test_account("admin")
+    threshold = sp.mutez(100)
+    below_threshold_logic = scenario_helpers.AcceptBelowThreshold(threshold)
+    from_threshold_logic = scenario_helpers.AcceptFromThreshold(threshold)
+    proxy = main.ProxyRosetta(admin.address, below_threshold_logic.address)
+    caller = main.CallerRosetta()
+    sc += below_threshold_logic
+    sc += from_threshold_logic
+    sc += proxy
+    sc += caller

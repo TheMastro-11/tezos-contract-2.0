@@ -22,3 +22,14 @@ def main():
         def timeout(self):
             assert sp.level >= self.data.reveal_timeout
             sp.send(self.data.owner, sp.balance)
+
+@sp.add_test()
+def test():
+    sc = sp.test_scenario("HTLCRosetta", main)
+    owner = sp.test_account("owner")
+    verifier = sp.test_account("verifier")
+    secret = "Test"
+    secret_hash = sp.keccak(sp.pack(secret))
+    delay = sp.nat(10)
+    empty_htlc = main.HTLCRosetta(owner.address, verifier.address, secret_hash, delay)
+    sc += empty_htlc

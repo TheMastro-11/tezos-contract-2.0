@@ -10,12 +10,13 @@ from contractUtils import (
     callInfoResult,
     runScenario
 )
-from folderScan import folderScan, scenarioScan
+from folderScan import folderScan, contractSuites, scenarioScan
 from csvUtils import csvReader, csvWriter
 from jsonUtils import getAddress, addressUpdate, jsonWriter
 from pytezos import pytezos
 import json
 from main import executionSetupCsv, executionSetupJson
+
 st.set_page_config(
     page_title="Tezos Smart Contract Toolchain",
     layout="centered"
@@ -26,6 +27,7 @@ st.caption("An interface to compile, deploy, interact with, and test Tezos smart
 
 TOOLCHAIN_ROOT = Path(__file__).resolve().parent
 PROJECT_ROOT = TOOLCHAIN_ROOT.parent
+
 
 def get_contracts_root() -> Path:
     candidates = [
@@ -38,8 +40,10 @@ def get_contracts_root() -> Path:
             return candidate.resolve()
     return candidates[0]
 
+
 def get_rosetta_scenarios_root() -> Path:
     return get_contracts_root() / "Rosetta" / "scenarios"
+
 
 def get_client(wallet_id):
     try:
@@ -57,11 +61,13 @@ def get_client(wallet_id):
         st.error(f"Error during client configuration: {e}")
         return None
 
+
 def parse_contract_id(contract_id: str) -> tuple[str, str]:
     if ":" in contract_id:
         folder, impl = contract_id.split(":", 1)
         return folder, impl
     return contract_id, contract_id
+
 
 def resolve_compiled_paths(folder: str, impl: str) -> tuple[Path, Path]:
     folder_name = Path(folder).name
@@ -80,20 +86,44 @@ def resolve_compiled_paths(folder: str, impl: str) -> tuple[Path, Path]:
         candidate_dirs[0] / "step_001_cont_0_storage.tz",
     )
 
+
 def execution_setup_auto(contract: str, rows):
     if isinstance(rows, dict):
         return executionSetupCsv(contractId=contract, rows=rows)
     return executionSetupJson(contractId=contract, rows=rows)
 
+
 def compile_view(client):
     st.header("1. Compile SmartPy Contracts")
-    contracts = folderScan(get_contracts_root())
-    contract_to_compile = st.selectbox("Select a contract to compile:", options=contracts, key="compile_select")
+    contracts_root = get_contracts_root()
+    suites = contractSuites(contracts_root)
+
+    if not suites:
+        st.warning("No contract families found in the contracts directory.")
+        return
+
+    selected_suite = st.selectbox(
+        "Select a contract family:",
+        options=suites,
+        key="compile_suite_select"
+    )
+
+    contracts = folderScan(contracts_root, suite=selected_suite)
+
+    if not contracts:
+        st.warning(f"No contracts found in '{selected_suite}'.")
+        return
+
+    contract_to_compile = st.selectbox(
+        "Select a contract to compile:",
+        options=contracts,
+        key="compile_select"
+    )
 
     if st.button("🚀 Compile"):
         if contract_to_compile and client:
             folder, impl = parse_contract_id(contract_to_compile)
-            contract_path = get_contracts_root() / folder / f"{impl}.py"
+            contract_path = contracts_root / folder / f"{impl}.py"
             with st.spinner(f"Compiling {contract_path}..."):
                 try:
                     compileContract(contractPath=str(contract_path))
@@ -102,6 +132,7 @@ def compile_view(client):
                 except Exception as e:
                     st.error("Error during compilation")
                     st.code(str(e))
+
 
 def deploy_view(client):
     st.header("2. Deploy a Contract (Origination)")
@@ -142,6 +173,7 @@ def deploy_view(client):
                         st.error("Origination failed. Check the console log for details.")
                 except Exception as e:
                     st.error(f"Error during deployment: {e}")
+
 
 def interact_view(client):
     st.header("3. Interact with a Contract")
@@ -197,6 +229,7 @@ def interact_view(client):
         except Exception as e:
             st.error(f"Unable to analyze contract entrypoints: {e}")
 
+
 def trace_view():
     st.header("4. Execute Trace from CSV File")
     st.info("This function executes a series of predefined transactions from the files in `execution_traces/`.")
@@ -223,6 +256,7 @@ def trace_view():
 
         except Exception as e:
             st.error(f"Error during trace execution: {e}")
+
 
 def scenario_view():
     st.header("5. Test Scenario")
@@ -257,11 +291,13 @@ def scenario_view():
                 st.error("Error during scenario execution")
                 st.code(str(e), language="text")
 
+
 def exportResult(opResult):
     fileName = "transactionsOutput"
     csvWriter(fileName=fileName+".csv", op_result=opResult)
     jsonWriter(fileName=fileName+".json", opReport=opResult)
     st.success(f"Result of operation {opResult['entryPoint']} saved to file.")
+
 
 st.sidebar.header("🔧 Configuration")
 wallet_selection = st.sidebar.selectbox("Select an Account (from wallet.json):", options=["1", "2", "3"])

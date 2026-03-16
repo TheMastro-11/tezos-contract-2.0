@@ -40,3 +40,13 @@ def main():
 
             if (self.data.player2.is_some()):
                 sp.send(self.data.player2.unwrap_some(), self.data.wager)
+
+@sp.add_test()
+def test():
+    sc = sp.test_scenario("BetRosetta")
+    player1 = sp.test_account("player1")
+    oracle = sp.test_account("oracle")
+    timeout = sp.nat(10)
+    wager = sp.mutez(500)
+    bet_player1 = main.BetRosetta(player1.address, oracle.address, timeout, wager)
+    sc += bet_player1

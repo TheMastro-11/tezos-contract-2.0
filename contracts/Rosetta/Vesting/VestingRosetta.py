@@ -26,3 +26,12 @@ def main():
             self.data.released = self.data.released + amount
             sp.send(self.data.beneficiary, utils.nat_to_mutez(amount))
             sp.emit(amount)
+
+@sp.add_test()
+def test():
+    sc = sp.test_scenario("VestingRosetta", main)
+    beneficiary = sp.test_account("beneficiary")
+    start_level = sp.nat(5)
+    duration = sp.nat(10)
+    vesting = main.VestingRosetta(beneficiary.address, start_level, duration)
+    sc += vesting

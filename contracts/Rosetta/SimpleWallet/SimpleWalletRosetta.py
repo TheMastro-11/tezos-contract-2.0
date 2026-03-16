@@ -50,3 +50,10 @@ def main():
         def withdraw(self):
             assert sp.sender == self.data.owner, "Only the owner"
             sp.send(sp.sender, sp.balance)
+
+@sp.add_test()
+def test():
+    sc = sp.test_scenario("SimpleWalletRosetta", [t,main])
+    owner = sp.test_account("owner")
+    wallet = main.SimpleWalletRosetta(owner.address)
+    sc += wallet

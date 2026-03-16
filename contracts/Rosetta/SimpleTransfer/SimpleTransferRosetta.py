@@ -18,3 +18,11 @@ def main():
             assert amount <= sp.balance, "the contract balance is less then required amount"
             
             sp.send(self.data.recipient, amount)
+
+@sp.add_test()
+def test():
+    sc = sp.test_scenario("SimpleTransferRosetta", main)
+    owner = sp.test_account("owner")
+    recipient = sp.test_account("recipient")
+    sitr = main.SimpleTransferRosetta(owner.address, recipient.address)
+    sc += sitr

@@ -86,3 +86,22 @@ def main():
             self.data.total_released += utils.nat_to_mutez(payment)
             
             sp.send(account, utils.nat_to_mutez(payment))
+
+@sp.add_test()
+def test():
+    sc = sp.test_scenario("PaymentSplitterRosetta", main)
+    admin = sp.test_account("admin")
+    mario = sp.test_account("mario")
+    luca = sp.test_account("luca")
+    payees = [
+        admin.address,
+        mario.address,
+        luca.address,
+    ]
+    shares = [
+        sp.nat(50),
+        sp.nat(30),
+        sp.nat(20),
+    ]
+    payment_splitter = main.PaymentSplitterRosetta(shares, payees)
+    sc += payment_splitter

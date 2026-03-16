@@ -14,3 +14,9 @@ def main():
         @sp.entrypoint
         def storeString(self, text_string: sp.string):
             self.data.text_string = sp.Some(text_string)
+
+@sp.add_test()
+def test():
+    sc = sp.test_scenario("StorageRosetta", main)
+    storage = main.StorageRosetta()
+    sc += storage

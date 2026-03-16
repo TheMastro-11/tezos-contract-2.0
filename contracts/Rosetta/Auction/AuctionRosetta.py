@@ -54,3 +54,10 @@ def main():
             assert sp.now >= self.data.end_time.unwrap_some(), "Auction not ended"
             self.data.state = sp.cast(sp.variant.CLOSED(), states)
             sp.send(self.data.seller, self.data.highest_bid)
+
+@sp.add_test()
+def test():
+    sc = sp.test_scenario("AuctionRosetta", main)
+    seller = sp.test_account("seller")
+    auction = main.AuctionRosetta(seller.address, "reason", sp.mutez(5))
+    sc += auction

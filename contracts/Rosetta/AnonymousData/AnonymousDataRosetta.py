@@ -24,3 +24,9 @@ def main():
             id = sp.keccak(sp.pack((sp.sender, nonce)))
             assert self.data.storedData.contains(id)
             return self.data.storedData[id]
+
+@sp.add_test()
+def test():
+    sc = sp.test_scenario("AnonymousDataRosetta")
+    c1 = main.AnonymousDataRosetta()
+    sc += c1

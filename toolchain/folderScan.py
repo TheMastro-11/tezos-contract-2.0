@@ -1,9 +1,13 @@
 from pathlib import Path
 
+SKIP_DIRS = {"__pycache__", "Library"}
+
+
 def normalizeRoot(path):
     return Path(path).expanduser().resolve()
 
-def folderScan(path):
+
+def folderScan(path, suite=None, include_scenarios=False):
     base_path = normalizeRoot(path)
 
     if base_path.name == "scenarios":
@@ -21,7 +25,7 @@ def folderScan(path):
         )
 
     targets = set()
-    skip_dirs = {"__pycache__", "Library", "scenarios"}
+    normalized_suite = suite.lower() if suite else None
 
     for py_file in base_path.rglob("*.py"):
         relative_parent = py_file.parent.relative_to(base_path)
@@ -30,7 +34,13 @@ def folderScan(path):
         if not parts:
             continue
 
-        if any(part.startswith('.') or part in skip_dirs for part in parts):
+        if any(part.startswith('.') or part in SKIP_DIRS for part in parts):
+            continue
+
+        if not include_scenarios and "scenarios" in parts:
+            continue
+
+        if normalized_suite and parts[0].lower() != normalized_suite:
             continue
 
         if parts[0] in {"Legacy", "Rosetta"} and len(parts) >= 2:
@@ -42,5 +52,20 @@ def folderScan(path):
 
     return sorted(targets)
 
+
 def scenarioScan(path):
     return folderScan(path)
+
+
+def contractSuites(path):
+    base_path = normalizeRoot(path)
+
+    if base_path.name != "contracts" or not base_path.exists():
+        return []
+
+    suites = []
+    for entry in sorted(base_path.iterdir()):
+        if entry.is_dir() and not entry.name.startswith('.') and entry.name not in SKIP_DIRS:
+            suites.append(entry.name)
+
+    return suites

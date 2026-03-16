@@ -30,3 +30,10 @@ def main():
             self.data.donors[sp.sender] = sp.mutez(0)
             
             sp.send(sp.sender, amount)
+            
+@sp.add_test()
+def test():
+    sc = sp.test_scenario("CrowdfundRosetta")
+    recipient = sp.test_account("recipient")
+    successful = main.CrowdfundRosetta(recipient.address, sp.nat(10), sp.mutez(100))
+    sc += successful

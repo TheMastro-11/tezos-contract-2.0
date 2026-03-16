@@ -37,3 +37,9 @@ def main():
         @sp.onchain_view
         def get_exchange_rate(self):
             return self.data.exchange_rate
+
+@sp.add_test()
+def test():
+    sc = sp.test_scenario("PriceBetRosetta", main)
+    oracle_win = main.Oracle()
+    sc += oracle_win

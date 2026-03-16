@@ -36,3 +36,12 @@ def main():
             self.data.state = sp.cast(sp.variant.CLOSED(), states)
             
             sp.send(self.data.buyer, self.data.amount)
+
+@sp.add_test()
+def test():
+    sc = sp.test_scenario("EscrowRosetta")
+    seller = sp.test_account("seller")
+    buyer = sp.test_account("buyer")
+    amount = sp.mutez(1000)
+    escrow_pay = main.EscrowRosetta(amount, buyer.address, seller.address)
+    sc += escrow_pay

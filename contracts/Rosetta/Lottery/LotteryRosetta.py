@@ -95,3 +95,10 @@ def main():
             sp.send(self.data.winner.unwrap_some(), sp.balance)
             
             self.data.status = sp.cast(sp.variant.End(), status)
+
+@sp.add_test()
+def test():
+    sc = sp.test_scenario("LotteryRosetta", main)
+    owner = sp.test_account("owner")
+    lottery = main.LotteryRosetta(owner.address)
+    sc += lottery

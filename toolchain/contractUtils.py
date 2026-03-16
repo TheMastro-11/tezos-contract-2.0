@@ -39,7 +39,6 @@ def compileContract(contractPath):
         raise RuntimeError(f"Compilation failed for '{contractPath}'.") from e
 
 
-
 def runScenario(scenarioPath):
     scenario_path = Path(scenarioPath)
 
@@ -65,6 +64,7 @@ def runScenario(scenarioPath):
         if message:
             raise RuntimeError(f"Scenario execution failed for '{scenarioPath}':\n{message}") from e
         raise RuntimeError(f"Scenario execution failed for '{scenarioPath}'.") from e
+
 
 ##Deploy
 

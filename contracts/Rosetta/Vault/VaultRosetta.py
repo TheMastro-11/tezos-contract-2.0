@@ -46,3 +46,12 @@ def main():
             assert self.data.state == sp.cast(sp.variant.REQ(), states)
             assert sp.sender == self.data.recovery
             self.data.state = sp.cast(sp.variant.IDLE(), states)
+
+@sp.add_test()
+def test():
+    sc = sp.test_scenario("VaultRosetta", main)
+    owner = sp.test_account("owner")
+    recovery = sp.test_account("recovery")
+    wait_time = sp.nat(10)
+    vault = main.VaultRosetta(owner.address, recovery.address, wait_time)
+    sc += vault

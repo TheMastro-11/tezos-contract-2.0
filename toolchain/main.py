@@ -8,6 +8,7 @@ import json
 TOOLCHAIN_ROOT = Path(__file__).resolve().parent
 PROJECT_ROOT = TOOLCHAIN_ROOT.parent
 
+
 def getContractsRoot():
     candidates = [
         PROJECT_ROOT / "contracts",
@@ -19,14 +20,17 @@ def getContractsRoot():
             return candidate.resolve()
     return candidates[0]
 
+
 def getScenariosRoot():
     return getContractsRoot() / "Rosetta" / "scenarios"
+
 
 def parseContractId(contractId):
     if ':' in contractId:
         folder, file_base = contractId.split(':', 1)
         return folder, file_base
     return contractId, contractId
+
 
 def compiledOutputDir(contractFolder, fileBase):
     if Path(f"./{fileBase}").exists():
@@ -35,6 +39,20 @@ def compiledOutputDir(contractFolder, fileBase):
     if Path(f"./{folder_name}").exists():
         return folder_name
     return contractFolder
+
+
+def selectContractSuite():
+    suites = contractSuites(getContractsRoot())
+    if not suites:
+        raise Exception("No contract families found in the contracts directory.")
+
+    print("\nContract families available:\n")
+    for index, suite in enumerate(suites, start=1):
+        print(index, " " + suite)
+
+    suiteSel = int(input("Which contract family do you want to use?\n"))
+    return suites[suiteSel-1]
+
 
 def interactionSetup(client, contractId):
     addressValid = getAddress()
@@ -76,6 +94,7 @@ def interactionSetup(client, contractId):
     infoResult["entryPoint"] = entryList[entrypointSel-1]
     return infoResult
 
+
 def executionSetupCsv(contractId, rows):
     infoResultDict = {}
     for element in rows:
@@ -115,6 +134,7 @@ def executionSetupCsv(contractId, rows):
 
     return infoResultDict
 
+
 def executionSetupJson(contractId, rows):
     infoResultDict = {}
 
@@ -148,6 +168,7 @@ def executionSetupJson(contractId, rows):
 
     return infoResultDict
 
+
 def scenarioSetup():
     scenariosRoot = getScenariosRoot()
     if not scenariosRoot.exists():
@@ -167,12 +188,14 @@ def scenarioSetup():
     scenarioPath = scenariosRoot / f"{scenarios[scenarioSel-1]}.py"
     return runScenario(str(scenarioPath))
 
+
 def exportResult(opResult):
     fileName = "transactionsOutput"
     csvWriter(fileName=fileName+".csv", op_result=opResult)
     print("\nCSV Updated!\n\n")
     jsonWriter(fileName=fileName+".json", opReport=opResult)
     print("\nJSON Updated!\n\n")
+
 
 def main():
     print("Hi, welcome to the Tezos-Contract toolchain!\n")
@@ -196,7 +219,11 @@ def main():
         key = wallet[walletSel]
         client = pytezos.using(shell="ghostnet", key=key)
 
-        allContracts = folderScan(contractsRoot)
+        selectedSuite = None
+        if operationSel == 1:
+            selectedSuite = selectContractSuite()
+
+        allContracts = folderScan(contractsRoot, suite=selectedSuite)
         print("\nContracts available (Folder:Implementation): \n")
         i = 1
         for contractId in allContracts:
@@ -259,7 +286,6 @@ def main():
         case 5:
             try:
                 result = scenarioSetup()
-                print("\nScenario executed successfully.\n")
                 if result.stdout:
                     print(result.stdout)
                 if result.stderr:
@@ -267,6 +293,3 @@ def main():
             except Exception as e:
                 print(f"\nERROR: {e}\n")
             main()
-
-if __name__ == "__main__":
-    main()

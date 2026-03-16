@@ -37,3 +37,9 @@ def main():
             assert self.data.product_list.contains(owner), "Address not avaiable"
 
             return self.data.product_list[owner]
+
+@sp.add_test()
+def testWallet():
+    sc = sp.test_scenario("FactoryRosetta", main)
+    factory = main.FactoryRosetta()
+    sc += factory
