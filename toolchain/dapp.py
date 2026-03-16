@@ -136,8 +136,30 @@ def compile_view(client):
 
 def deploy_view(client):
     st.header("2. Deploy a Contract (Origination)")
-    contracts = folderScan(get_contracts_root())
-    contract_to_deploy = st.selectbox("Select a contract to deploy:", options=contracts, key="deploy_select")
+    contracts_root = get_contracts_root()
+    suites = contractSuites(contracts_root)
+
+    if not suites:
+        st.warning("No contract families found in the contracts directory.")
+        return
+
+    selected_suite = st.selectbox(
+        "Select a contract family:",
+        options=suites,
+        key="deploy_suite_select"
+    )
+
+    contracts = folderScan(contracts_root, suite=selected_suite)
+
+    if not contracts:
+        st.warning(f"No contracts found in '{selected_suite}'.")
+        return
+
+    contract_to_deploy = st.selectbox(
+        "Select a contract to deploy:",
+        options=contracts,
+        key="deploy_select"
+    )
 
     initial_balance = st.number_input("Initial balance (in tez):", min_value=0, value=1, step=1)
 
