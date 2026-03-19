@@ -1,97 +1,134 @@
-from contractUtils import *
-from folderScan import *
-from csvUtils import *
-from jsonUtils import *
-from pathlib import Path
 import json
+from decimal import Decimal, InvalidOperation
+from pathlib import Path
 
-TOOLCHAIN_ROOT = Path(__file__).resolve().parent
-PROJECT_ROOT = TOOLCHAIN_ROOT.parent
+from pytezos import pytezos
+
+from contractUtils import (
+    compileContract,
+    origination,
+    contractInfoResult,
+    entrypointAnalyse,
+    entrypointCall,
+    callInfoResult,
+    runScenario,
+    getCompiledRoot,
+    waitForBlockDelay
+)
+from folderScan import folderScan, contractSuites, scenarioScan
+from csvUtils import csvReader, csvWriter
+from jsonUtils import getAddress, addressUpdate, jsonWriter, jsonReader, resolveAddress, normalizeTraceTitle, extractContractIdFromTraceTitle, updateDeploymentLevel, getDeploymentLevel
 
 
-def getContractsRoot():
+def getToolchainRoot() -> Path:
+    return Path(__file__).resolve().parent
+
+
+def getContractsRoot() -> Path:
     candidates = [
-        PROJECT_ROOT / "contracts",
-        TOOLCHAIN_ROOT / "contracts",
-        (TOOLCHAIN_ROOT / "../contracts").resolve(),
+        (getToolchainRoot() / "../contracts").resolve(),
+        getToolchainRoot() / "contracts"
     ]
+
     for candidate in candidates:
         if candidate.exists():
             return candidate.resolve()
+
     return candidates[0]
 
 
-def getScenariosRoot():
+def getScenariosRoot() -> Path:
     return getContractsRoot() / "Rosetta" / "scenarios"
 
 
+def getTraceRoot() -> Path:
+    toolchain_root = getToolchainRoot()
+    candidates = [
+        toolchain_root / "rosetta_traces",
+        toolchain_root / "execution_traces"
+    ]
+
+    for candidate in candidates:
+        if candidate.exists():
+            return candidate.resolve()
+
+    return candidates[0]
+
+
 def parseContractId(contractId):
-    if ':' in contractId:
-        folder, file_base = contractId.split(':', 1)
-        return folder, file_base
+    if ":" in contractId:
+        folder, fileBase = contractId.split(":", 1)
+        return folder, fileBase
     return contractId, contractId
+
+def findCompiledArtifactDir(compiledBaseDir):
+    compiledBaseDir = Path(compiledBaseDir)
+    directContract = compiledBaseDir / "step_001_cont_0_contract.tz"
+    directStorage = compiledBaseDir / "step_001_cont_0_storage.tz"
+    if directContract.exists() and directStorage.exists():
+        return compiledBaseDir
+
+    for contractPath in sorted(compiledBaseDir.rglob("step_001_cont_0_contract.tz")):
+        candidateDir = contractPath.parent
+        if (candidateDir / "step_001_cont_0_storage.tz").exists():
+            return candidateDir
+
+    return None
 
 
 def compiledOutputDir(contractFolder, fileBase):
-    if Path(f"./{fileBase}").exists():
-        return fileBase
-    folder_name = Path(contractFolder).name
-    if Path(f"./{folder_name}").exists():
-        return folder_name
-    return contractFolder
+    normalized_name = fileBase.removesuffix("Rosetta")
+    return str((getCompiledRoot() / normalized_name).resolve())
 
 
 def selectContractSuite():
-    suites = contractSuites(getContractsRoot())
-    if not suites:
-        raise Exception("No contract families found in the contracts directory.")
+    contractsRoot = getContractsRoot()
+    suites = contractSuites(contractsRoot)
 
-    print("\nContract families available:\n")
+    if not suites:
+        raise FileNotFoundError("No contract suites found.")
+
+    print("\nContract suites available:\n")
     for index, suite in enumerate(suites, start=1):
         print(index, " " + suite)
 
-    suiteSel = int(input("Which contract family do you want to use?\n"))
-    return suites[suiteSel-1]
+    suiteSel = int(input("Which contract suite do you want to use?\n"))
+    return suites[suiteSel - 1]
 
 
 def interactionSetup(client, contractId):
     addressValid = getAddress()
     contractAddress = resolveAddress(addressValid=addressValid, contractId=contractId)
+    entrypoints = entrypointAnalyse(client=client, contractAddress=contractAddress)
 
-    contractInterface = pytezos.contract(contractAddress)
-    entrypoints = contractInterface.entrypoints
-    if len(entrypoints) > 1 and "default" in entrypoints:
-        del entrypoints["default"]
-
-    i = 1
-    entryList = []
-    for entry in entrypoints:
-        print(i, entry)
-        entryList.append(entry)
-        i += 1
+    print("\nEntrypoints available:")
+    entryList = list(entrypoints.keys())
+    for index, entrypoint in enumerate(entryList, start=1):
+        print(index, " " + entrypoint)
 
     entrypointSel = int(input("Which entrypoint do you want to use?\n"))
-    entrypointSchema = entrypointAnalyse(client=client, contractAddress=contractAddress)
-    entrypointParam = entrypointSchema[entryList[entrypointSel-1]]
-    parameters = None
-    if entrypointParam != "unit":
+    entrypointName = entryList[entrypointSel - 1]
+
+    parameters = []
+    if entrypoints[entrypointName] != "unit":
         parameters = input("Insert parameters value: ")
         if "," in parameters:
             parameters = parameters.split(",")
         else:
             parameters = [parameters]
-    tezAmount = int(input("Insert tez amount: "))
+
+    tezAmount = parseAmountToTez(input("Insert tez amount: "))
 
     opResult = entrypointCall(
         client=client,
         contractAddress=contractAddress,
-        entrypointName=entryList[entrypointSel-1],
+        entrypointName=entrypointName,
         parameters=parameters,
         tezAmount=tezAmount
     )
     infoResult = callInfoResult(opResult=opResult)
     infoResult["contract"] = contractId
-    infoResult["entryPoint"] = entryList[entrypointSel-1]
+    infoResult["entryPoint"] = entrypointName
     return infoResult
 
 
@@ -101,11 +138,8 @@ def executionSetupCsv(contractId, rows):
         row = rows[element]
         entrypointSel = row[0]
         walletSel = row[1]
-        tezAmount = int(row[len(row)-1])
-        if row[2:len(row)-1] == []:
-            parameters = []
-        else:
-            parameters = row[2:len(row)-1]
+        tezAmount = parseAmountToTez(row[len(row)-1])
+        parameters = row[2:len(row)-1] if row[2:len(row)-1] != [] else []
 
         addressValid = getAddress()
         contractAddress = resolveAddress(addressValid=addressValid, contractId=contractId)
@@ -135,14 +169,213 @@ def executionSetupCsv(contractId, rows):
     return infoResultDict
 
 
-def executionSetupJson(contractId, rows):
-    infoResultDict = {}
+def normalizeWalletLabel(value):
+    return str(value).strip().lower()
 
-    for element in rows:
-        entrypointSel = rows["entrypoint"]
-        walletSel = rows["wallet"]
+
+def readWallets():
+    with open("wallet.json", 'r', encoding='utf-8') as file:
+        return json.load(file)
+
+
+def extractWalletLabels(traceData):
+    labels = []
+    seen = set()
+
+    for actor in traceData.get("trace_actors", []):
+        actor_label = normalizeWalletLabel(actor)
+        if actor_label and actor_label not in seen:
+            labels.append(actor_label)
+            seen.add(actor_label)
+
+    for step in traceData.get("trace_execution", []):
+        for actor in step.get("actors", []):
+            actor_label = normalizeWalletLabel(actor)
+            if actor_label and actor_label not in seen:
+                labels.append(actor_label)
+                seen.add(actor_label)
+
+        tezos_data = step.get("tezos", {})
+        provider_wallet = tezos_data.get("provider_wallet")
+        if provider_wallet:
+            provider_label = normalizeWalletLabel(provider_wallet)
+            if provider_label not in seen:
+                labels.append(provider_label)
+                seen.add(provider_label)
+
+    return labels
+
+
+def buildWalletMap(traceData, availableWallets):
+    normalized_wallets = {
+        normalizeWalletLabel(wallet_id): wallet_id
+        for wallet_id in availableWallets.keys()
+    }
+    wallet_labels = extractWalletLabels(traceData)
+    wallet_map = {}
+
+    ordered_wallet_ids = list(availableWallets.keys())
+    next_wallet_index = 0
+
+    for label in wallet_labels:
+        if label in normalized_wallets:
+            wallet_map[label] = normalized_wallets[label]
+            continue
+
+        if next_wallet_index >= len(ordered_wallet_ids):
+            raise ValueError("Not enough wallets configured in wallet.json for the execution trace.")
+
+        wallet_map[label] = ordered_wallet_ids[next_wallet_index]
+        next_wallet_index += 1
+
+    return wallet_map
+
+
+def parseAmountToTez(amountValue):
+    if amountValue is None or amountValue == "":
+        return Decimal("0")
+
+    if isinstance(amountValue, Decimal):
+        return amountValue
+
+    if isinstance(amountValue, int):
+        return Decimal(amountValue)
+
+    if isinstance(amountValue, float):
+        return Decimal(str(amountValue))
+
+    text = str(amountValue).strip()
+
+    try:
+        if text.startswith("mutez(") and text.endswith(")"):
+            mutez_value = Decimal(text[6:-1].strip())
+            return mutez_value / Decimal("1000000")
+
+        if text.startswith("tez(") and text.endswith(")"):
+            return Decimal(text[4:-1].strip())
+
+        return Decimal(text)
+    except InvalidOperation as e:
+        raise ValueError(f"Invalid tez amount: {amountValue}") from e
+
+
+def getContractSourcePath(contractId):
+    contractsRoot = getContractsRoot()
+    normalizedName = contractId.removesuffix("Rosetta")
+    matches = list((contractsRoot / "Rosetta").glob(f"**/{normalizedName}Rosetta.py"))
+    if not matches:
+        raise FileNotFoundError(f"Unable to resolve the source file for contract '{contractId}'.")
+    return matches[0]
+
+
+def getEntrypointParameterNames(contractId, entrypointName):
+    import ast
+
+    sourcePath = getContractSourcePath(contractId)
+    module = ast.parse(sourcePath.read_text(encoding="utf-8"))
+
+    for node in ast.walk(module):
+        if isinstance(node, ast.FunctionDef) and node.name == entrypointName:
+            decorators = []
+            for decorator in node.decorator_list:
+                if isinstance(decorator, ast.Attribute):
+                    decorators.append(decorator.attr)
+                elif isinstance(decorator, ast.Name):
+                    decorators.append(decorator.id)
+
+            if "entrypoint" in decorators:
+                return [arg.arg for arg in node.args.args if arg.arg != "self"]
+
+    raise ValueError(f"Unable to resolve entrypoint '{entrypointName}' in '{sourcePath}'.")
+
+
+def buildStepParameters(contractId, entrypointName, stepArgs):
+    filteredArgs = {
+        key: value
+        for key, value in stepArgs.items()
+        if not key.startswith("_")
+    }
+
+    if not filteredArgs:
+        return []
+
+    parameterNames = getEntrypointParameterNames(contractId, entrypointName)
+
+    if len(parameterNames) == 1:
+        parameterName = parameterNames[0]
+        if parameterName not in filteredArgs:
+            raise KeyError(
+                f"Parameter '{parameterName}' not found in trace args for '{contractId}.{entrypointName}'."
+            )
+        return filteredArgs[parameterName]
+
+    return {
+        parameterName: filteredArgs[parameterName]
+        for parameterName in parameterNames
+        if parameterName in filteredArgs
+    }
+
+
+def resolveStepWallet(step, walletMap):
+    tezos_data = step.get("tezos", {})
+    provider_wallet = tezos_data.get("provider_wallet")
+    if provider_wallet:
+        provider_label = normalizeWalletLabel(provider_wallet)
+        if provider_label in walletMap:
+            return walletMap[provider_label]
+
+    for actor in step.get("actors", []):
+        actor_label = normalizeWalletLabel(actor)
+        if actor_label in walletMap:
+            return walletMap[actor_label]
+
+    trace_actors = walletMap.keys()
+    for actor_label in trace_actors:
+        return walletMap[actor_label]
+
+    raise ValueError("No wallet could be resolved for the trace step.")
+
+
+def normalizeJsonTrace(traceData):
+    availableWallets = readWallets()
+    walletMap = buildWalletMap(traceData, availableWallets)
+    normalizedRows = {}
+    traceContractId = extractContractIdFromTraceTitle(traceData.get("trace_title", ""))
+
+    if not traceContractId:
+        raise ValueError("Unable to resolve the contract name from 'trace_title'.")
+
+    for step in traceData.get("trace_execution", []):
+        args = step.get("args", {})
+        tezos_data = step.get("tezos", {})
+
+        normalizedRows[step["sequence_id"]] = {
+            "entrypoint": step["function_name"],
+            "wallet": resolveStepWallet(step, walletMap),
+            "contractId": traceContractId,
+            "parameters": buildStepParameters(traceContractId, step["function_name"], args),
+            "tezAmount": parseAmountToTez(tezos_data.get("_amount", args.get("_amount"))),
+            "waitingTime": int(step.get("waiting_time", 0) or 0)
+        }
+
+    return normalizedRows
+
+
+def executionSetupJson(contractId, traceData):
+    normalizedRows = normalizeJsonTrace(traceData)
+    infoResultDict = {}
+    lastConfirmedBlockLevel = getDeploymentLevel(contractId)
+
+    for element, row in normalizedRows.items():
+        currentContractId = row["contractId"]
+        entrypointSel = row["entrypoint"]
+        walletSel = row["wallet"]
+        parameters = row["parameters"]
+        tezAmount = row["tezAmount"]
+        waitingTime = row["waitingTime"]
+
         addressValid = getAddress()
-        contractAddress = resolveAddress(addressValid=addressValid, contractId=contractId)
+        contractAddress = resolveAddress(addressValid=addressValid, contractId=currentContractId)
         contractInterface = pytezos.contract(contractAddress)
         entrypoints = contractInterface.entrypoints
         if entrypointSel not in entrypoints:
@@ -153,6 +386,13 @@ def executionSetupJson(contractId, rows):
         key = wallet[walletSel]
         client = pytezos.using(shell="ghostnet", key=key)
 
+        if waitingTime > 0 and lastConfirmedBlockLevel is not None:
+            waitForBlockDelay(
+                client=client,
+                startBlockLevel=lastConfirmedBlockLevel,
+                waitingTime=waitingTime
+            )
+
         opResult = entrypointCall(
             client=client,
             contractAddress=contractAddress,
@@ -161,8 +401,11 @@ def executionSetupJson(contractId, rows):
             tezAmount=tezAmount
         )
         infoResult = callInfoResult(opResult=opResult)
-        infoResult["contract"] = contractId
+        infoResult["contract"] = currentContractId
         infoResult["entryPoint"] = entrypointSel
+
+        if "confirmed_level" in opResult:
+            lastConfirmedBlockLevel = opResult["confirmed_level"]
 
         infoResultDict[element] = infoResult
 
@@ -179,10 +422,8 @@ def scenarioSetup():
         raise FileNotFoundError("No scenario files found.")
 
     print("\nScenarios available:\n")
-    i = 1
-    for scenario in scenarios:
-        print(i, " " + scenario)
-        i += 1
+    for index, scenario in enumerate(scenarios, start=1):
+        print(index, " " + scenario)
 
     scenarioSel = int(input("Which scenario do you want to test?\n"))
     scenarioPath = scenariosRoot / f"{scenarios[scenarioSel-1]}.py"
@@ -191,9 +432,9 @@ def scenarioSetup():
 
 def exportResult(opResult):
     fileName = "transactionsOutput"
-    csvWriter(fileName=fileName+".csv", op_result=opResult)
+    csvWriter(fileName=fileName + ".csv", op_result=opResult)
     print("\nCSV Updated!\n\n")
-    jsonWriter(fileName=fileName+".json", opReport=opResult)
+    jsonWriter(fileName=fileName + ".json", opReport=opResult)
     print("\nJSON Updated!\n\n")
 
 
@@ -225,10 +466,8 @@ def main():
 
         allContracts = folderScan(contractsRoot, suite=selectedSuite)
         print("\nContracts available (Folder:Implementation): \n")
-        i = 1
-        for contractId in allContracts:
-            print(i, " " + contractId)
-            i += 1
+        for index, contractId in enumerate(allContracts, start=1):
+            print(index, " " + contractId)
 
         contractSel = int(input("Which contract do you want to use?\n"))
         contractId = allContracts[contractSel-1]
@@ -244,10 +483,11 @@ def main():
             main()
 
         case 2:
-            out_dir = compiledOutputDir(contractFolder=contractFolder, fileBase=fileBase)
-            if Path("./"+out_dir).exists():
-                michelsonPath = Path(f"./{out_dir}/step_001_cont_0_contract.tz").read_text()
-                storagePath = Path(f"./{out_dir}/step_001_cont_0_storage.tz").read_text()
+            out_dir = Path(compiledOutputDir(contractFolder=contractFolder, fileBase=fileBase))
+            artifact_dir = findCompiledArtifactDir(out_dir) if out_dir.exists() else None
+            if artifact_dir is not None:
+                michelsonPath = (artifact_dir / "step_001_cont_0_contract.tz").read_text()
+                storagePath = (artifact_dir / "step_001_cont_0_storage.tz").read_text()
                 initialBalance = int(input("Insert an initial balance:"))
                 op_result = origination(
                     client=client,
@@ -257,6 +497,8 @@ def main():
                 )
                 contractInfo = contractInfoResult(op_result=op_result)
                 addressUpdate(contract=contractId, newAddress=contractInfo["address"])
+                if "ConfirmedLevel" in contractInfo:
+                    updateDeploymentLevel(contract=contractId, confirmedLevel=contractInfo["ConfirmedLevel"])
             else:
                 print("\n\033[1m Contract must be compiled before \033[0m\n\n")
 
@@ -271,15 +513,18 @@ def main():
 
         case 4:
             formatSel = input("CSV(1) or JSON(2)?")
-            if formatSel == 1:
+            if str(formatSel) == "1":
                 contractExecutionTraces = csvReader()
+                for contract in contractExecutionTraces:
+                    results = executionSetupCsv(contractId=contract, rows=contractExecutionTraces[contract])
+                    for result in results:
+                        exportResult(results[result])
             else:
-                contractExecutionTraces = jsonReader()
-
-            for contract in contractExecutionTraces:
-                results = executionSetupCsv(contractId=contract, rows=contractExecutionTraces[contract])
-                for result in results:
-                    exportResult(results[result])
+                traceExecutionTraces = jsonReader(traceRoot=getTraceRoot())
+                for traceName, traceData in traceExecutionTraces.items():
+                    results = executionSetupJson(contractId=traceName, traceData=traceData)
+                    for result in results:
+                        exportResult(results[result])
 
             main()
 
@@ -293,3 +538,7 @@ def main():
             except Exception as e:
                 print(f"\nERROR: {e}\n")
             main()
+
+
+if __name__ == "__main__":
+    main()

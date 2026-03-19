@@ -31,8 +31,8 @@ def test():
     sc.verify(auction.data.end_time.unwrap_some() == sp.timestamp(100))
 
     auction.bid(_sender=alice.address, _amount=sp.mutez(5), _now=sp.timestamp(10), _valid=False)
-    auction.bid(_sender=alice.address, _amount=sp.mutez(10), _now=sp.timestamp(10), _valid=False)
-    auction.withdraw(_sender=alice.address, _now=sp.timestamp(20), _valid=False)
+    auction.bid(_sender=alice.address, _amount=sp.mutez(10), _now=sp.timestamp(10))
+    auction.withdraw(_sender=alice.address, _now=sp.timestamp(20))
 
     auction.end(_sender=seller.address, _now=sp.timestamp(50), _valid=False)
     auction.end(_sender=bob.address, _now=sp.timestamp(101), _valid=False)
@@ -41,3 +41,14 @@ def test():
     sc.verify(auction.data.state == sp.variant.CLOSED(sp.unit))
     auction.bid(_sender=bob.address, _amount=sp.mutez(25), _now=sp.timestamp(102), _valid=False)
     auction.withdraw(_sender=bob.address, _now=sp.timestamp(103), _valid=False)
+
+    
+    auction2 = main.AuctionRosetta(seller.address, "reason", sp.mutez(5))
+    sc += auction2
+    
+    auction2.start(5, _sender=seller.address, _now=sp.timestamp(0))
+    auction2.bid(_sender=bob.address, _amount=sp.mutez(25), _now=sp.timestamp(1))
+    auction2.withdraw(_sender=bob.address, _now=sp.timestamp(3))
+    auction2.end(_sender=seller.address, _now=sp.timestamp(6))
+
+

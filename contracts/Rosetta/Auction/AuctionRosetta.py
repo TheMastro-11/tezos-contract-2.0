@@ -34,7 +34,7 @@ def main():
             if (self.data.highest_bidder.is_some()):
                 self.data.bids[self.data.highest_bidder.unwrap_some()] = self.data.highest_bid
 
-            if (self.data.bids[sp.sender] != sp.mutez(0)):
+            if (self.data.bids.contains(sp.sender) and self.data.bids[sp.sender] != sp.mutez(0)):
                 sp.transfer((), sp.mutez(0), sp.self_entrypoint("withdraw"))
 
             self.data.highest_bidder = sp.Some(sp.sender)
@@ -42,10 +42,11 @@ def main():
 
         @sp.entrypoint
         def withdraw(self):
-            assert self.data.state != sp.cast(sp.variant.WAIT_CLOSING(), states), "Auction not started"
-            bal = self.data.bids[sp.sender]
-            self.data.bids[sp.sender] = sp.mutez(0)
-            sp.send(sp.sender, bal)
+            assert self.data.state == sp.cast(sp.variant.WAIT_CLOSING(), states), "Auction not started"
+            if self.data.bids.contains(sp.sender):
+                bal = self.data.bids[sp.sender]
+                self.data.bids[sp.sender] = sp.mutez(0)
+                sp.send(sp.sender, bal)
 
         @sp.entrypoint
         def end(self):
@@ -54,10 +55,10 @@ def main():
             assert sp.now >= self.data.end_time.unwrap_some(), "Auction not ended"
             self.data.state = sp.cast(sp.variant.CLOSED(), states)
             sp.send(self.data.seller, self.data.highest_bid)
-
+            
 @sp.add_test()
 def test():
     sc = sp.test_scenario("AuctionRosetta", main)
-    seller = sp.test_account("seller")
-    auction = main.AuctionRosetta(seller.address, "reason", sp.mutez(5))
+    seller = sp.address("tz1SL2xBdmLSD2W3Hs84SfH912xDpYtAjsaa")
+    auction = main.AuctionRosetta(seller, "reason", sp.mutez(5))
     sc += auction

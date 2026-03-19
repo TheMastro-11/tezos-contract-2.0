@@ -1,0 +1,100 @@
+{
+  "trace_title": "Auction",
+  "trace_actors": [
+    "seller",
+    "alice",
+    "bob"
+  ],
+  "configuration": {
+    "solana": {
+      "use": "True"
+    },
+    "ethereum": {
+      "network": "localhost",
+      "use": "True",
+      "deploy_config": {
+        "settings": {
+          "sender_wallet": "seller"
+        },
+        "_object": "monitor",
+        "_startingBid": "1"
+      }
+    },
+    "tezos": {
+      "use": "False"
+    },
+    "cardano": {
+      "use": "False"
+    }
+  },
+  "trace_execution": [
+    {
+      "sequence_id": "1",
+      "function_name": "start",
+      "waiting_time": 0,
+      "actors": [
+        "seller"
+      ],
+      "args": {
+        "duration": 30
+      },
+      "tezos": {},
+      "cardano": {},
+      "evm": {},
+      "solana": {
+        "provider_wallet": "seller",
+        "send_transaction": true
+      }
+    },
+    {
+      "sequence_id": "2",
+      "function_name": "bid",
+      "waiting_time": 0,
+      "actors": [
+        "alice"
+      ],
+      "args": {},
+      "tezos": {
+        "_amount": 10
+      },
+      "cardano": {},
+      "evm": {},
+      "solana": {
+        "provider_wallet": "alice",
+        "send_transaction": true
+      }
+    },
+    {
+      "sequence_id": "3",
+      "function_name": "withdraw",
+      "waiting_time": 0,
+      "actors": [
+        "alice"
+      ],
+      "args": {},
+      "tezos": {},
+      "cardano": {},
+      "evm": {},
+      "solana": {
+        "provider_wallet": "alice",
+        "send_transaction": true
+      }
+    },
+    {
+      "sequence_id": "4",
+      "function_name": "end",
+      "waiting_time": 30,
+      "actors": [
+        "seller"
+      ],
+      "args": {},
+      "tezos": {},
+      "cardano": {},
+      "evm": {},
+      "solana": {
+        "provider_wallet": "seller",
+        "send_transaction": true
+      }
+    }
+  ]
+}

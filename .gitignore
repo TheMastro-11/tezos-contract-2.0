@@ -8,6 +8,7 @@ toolchain/__pycache__
 toolchain/wallet.json
 toolchain/transactionsOutput.csv
 toolchain/transactionsOutput.json
+toolchain/compiled/
 
 __pycache__
 contracts/addressList.json

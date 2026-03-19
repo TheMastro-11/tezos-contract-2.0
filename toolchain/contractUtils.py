@@ -5,18 +5,93 @@ from pytezos.michelson.parse import michelson_to_micheline
 import time
 import subprocess
 import sys
+import json
+import re
+from decimal import Decimal
 
 MUTEZ_CONV = 1000000
-##Compiler
-def compileContract(contractPath):
-    print(f">>> Compiling '{contractPath}'...")
 
-    if not Path(contractPath).is_file():
-        raise FileNotFoundError(f"'{contractPath}' not found.")
+
+def _normalize_compiled_name(contract_path: Path) -> str:
+    name = contract_path.stem
+    name = re.sub(r"Rosetta$", "", name)
+    return name
+
+
+def getCompiledRoot() -> Path:
+    compiled_root = Path(__file__).resolve().parent / "compiled"
+    compiled_root.mkdir(parents=True, exist_ok=True)
+    return compiled_root
+
+
+def getCompiledContractDir(contractPath) -> Path:
+    contract_path = Path(contractPath).resolve()
+    output_dir = getCompiledRoot() / _normalize_compiled_name(contract_path)
+    output_dir.mkdir(parents=True, exist_ok=True)
+    return output_dir
+
+
+def getCurrentBlockLevel(client):
+    header = client.shell.head.header()
+    return int(header["level"])
+
+
+def waitForBlockDelay(client, startBlockLevel, waitingTime, pollIntervalSeconds=10):
+    waiting_blocks = int(waitingTime or 0)
+
+    if waiting_blocks <= 0:
+        return startBlockLevel
+
+    target_level = int(startBlockLevel) + waiting_blocks
+    print(
+        f"Waiting for {waiting_blocks} block(s) before the next step. "
+        f"Start level: {startBlockLevel}, target level: {target_level}"
+    )
+
+    current_level = getCurrentBlockLevel(client)
+    while current_level < target_level:
+        remaining_blocks = target_level - current_level
+        print(
+            f"   -> Current level: {current_level}. "
+            f"Waiting for {remaining_blocks} more block(s)..."
+        )
+        time.sleep(pollIntervalSeconds)
+        current_level = getCurrentBlockLevel(client)
+
+    print(f"   -> Target level reached: {current_level}")
+    return current_level
+
+
+def compileContract(contractPath):
+    contract_path = Path(contractPath).resolve()
+    print(f">>> Compiling '{contract_path}'...")
+
+    if not contract_path.is_file():
+        raise FileNotFoundError(f"'{contract_path}' not found.")
+
+    output_dir = getCompiledContractDir(contract_path)
+
+    for artifact in output_dir.rglob("step_*"):
+        if artifact.is_file():
+            artifact.unlink()
+    for extra_dir in sorted(output_dir.iterdir()):
+        if extra_dir.is_dir() and extra_dir.name.endswith("Rosetta"):
+            for nested in extra_dir.iterdir():
+                if nested.is_file():
+                    nested.unlink()
+            extra_dir.rmdir()
+
+    metadata = {
+        "contract_id": f"{contract_path.parent.relative_to(contract_path.parents[2]).as_posix()}:{contract_path.stem}",
+        "contract_name": _normalize_compiled_name(contract_path),
+        "source": str(contract_path),
+        "output_dir": str(output_dir)
+    }
 
     try:
         result = subprocess.run(
-            [sys.executable, contractPath],
+            [sys.executable, str(contract_path)],
+            cwd=str(output_dir),
             check=True,
             capture_output=True,
             text=True
@@ -24,7 +99,21 @@ def compileContract(contractPath):
         if result.stdout:
             print(result.stdout)
 
-        print(f">>> '{contractPath}' compiled!")
+        nested_dirs = sorted(
+            path for path in output_dir.iterdir()
+            if path.is_dir() and path.name.endswith("Rosetta")
+        )
+        if nested_dirs:
+            artifact_dir = nested_dirs[0]
+            for artifact in artifact_dir.iterdir():
+                target = output_dir / artifact.name
+                if target.exists() and target.is_file():
+                    target.unlink()
+                artifact.replace(target)
+            artifact_dir.rmdir()
+
+        (output_dir / "metadata.json").write_text(json.dumps(metadata, indent=2), encoding="utf-8")
+        print(f">>> '{contract_path}' compiled in '{output_dir}'!")
         return result
 
     except subprocess.CalledProcessError as e:
@@ -33,10 +122,10 @@ def compileContract(contractPath):
         if e.stderr:
             print(e.stderr)
 
-        details = (e.stderr or e.stdout or '').strip()
+        details = (e.stderr or e.stdout or "").strip()
         if details:
-            raise RuntimeError(f"Compilation failed for '{contractPath}':\n{details}") from e
-        raise RuntimeError(f"Compilation failed for '{contractPath}'.") from e
+            raise RuntimeError(f"Compilation failed for '{contract_path}':\n{details}") from e
+        raise RuntimeError(f"Compilation failed for '{contract_path}'.") from e
 
 
 def runScenario(scenarioPath):
@@ -66,10 +155,7 @@ def runScenario(scenarioPath):
         raise RuntimeError(f"Scenario execution failed for '{scenarioPath}'.") from e
 
 
-##Deploy
-
 def origination(client, michelsonCode, initialStorage, initialBalance):
-
     parsed_code = michelson_to_micheline(michelsonCode)
     parsed_storage = michelson_to_micheline(initialStorage)
 
@@ -81,21 +167,22 @@ def origination(client, michelsonCode, initialStorage, initialBalance):
                 'code': parsed_code,
                 'storage': parsed_storage
             },
-            balance = initialBalance * MUTEZ_CONV
+            balance=initialBalance * MUTEZ_CONV
         ).autofill().sign()
-        
+
         op_hash = op_group.inject(_async=False)['hash']
         print(f"Operation send! Hash: {op_hash}")
-        
+
         start_time = time.time()
-        timeout = 500 
+        timeout = 500
         op_result = None
-        
+
         while time.time() - start_time < timeout:
             try:
                 op_result = client.shell.blocks[-10:].find_operation(op_hash)
-                print(f"Operation Found")
-                break 
+                print("Operation Found")
+                op_result["confirmed_level"] = getCurrentBlockLevel(client)
+                break
             except StopIteration:
                 print(f"   -> Not yet completed (time passed: {int(time.time() - start_time)}s)")
                 time.sleep(15)
@@ -104,85 +191,86 @@ def origination(client, michelsonCode, initialStorage, initialBalance):
             print(f"\n❌ TIMEOUT: The operation has not be included after {timeout} seconds.")
             print("Operation could be failed or not choosen by bakers. (check fees)")
             return None
-        
+
         return op_result
 
     except Exception as e:
         print(traceback.format_exc())
         print(f"Error {e}")
 
+
 def contractInfoResult(op_result):
-    #print("\n" + "="*20 + " COST ANALYZIS " + "="*20)
     deployReport = {}
-    
+
     try:
         deployReport["hash"] = op_result["hash"]
         content = op_result['contents'][0]
         metadata = content.get('metadata', {})
         op_result_info = metadata.get('operation_result', {})
         originated_contracts = op_result_info.get('originated_contracts')
+        contract_address = None
         if originated_contracts:
             contract_address = originated_contracts[0]
-        
+
         deployReport["address"] = contract_address
-        
-        # BakerFee
+
         fee_mutez = int(content.get('fee', 0))
         deployReport["BakerFee"] = fee_mutez
 
-        # Gas
         consumed_milligas = int(op_result_info.get('consumed_milligas', 0))
         deployReport["Gas"] = consumed_milligas
 
-        # Storage Fee (Burn)
         storage_size_diff = int(op_result_info.get('paid_storage_size_diff', 0))
         storage_burn_cost_mutez = storage_size_diff * 250
         deployReport["Storage"] = storage_burn_cost_mutez
-        
+
         total_cost_mutez = fee_mutez + storage_burn_cost_mutez
         deployReport["TotalCost"] = total_cost_mutez
-        
+
+        if "confirmed_level" in op_result:
+            deployReport["ConfirmedLevel"] = op_result["confirmed_level"]
+
         return deployReport
 
     except (KeyError, IndexError, TypeError) as e:
         print(f"Errore: {e}")
 
-##Contract Call
-def entrypointCall(client, contractAddress, entrypointName, parameters, tezAmount):
 
+def entrypointCall(client, contractAddress, entrypointName, parameters, tezAmount):
+    if tezAmount is None:
+        tezAmount = Decimal("0")
+    elif not isinstance(tezAmount, Decimal):
+        tezAmount = Decimal(str(tezAmount))
     contract_interface = client.contract(contractAddress)
 
     print(f"\n Calling {entrypointName} entrypoint...\n")
-    
-    parametersDict = {}
-    if parameters != [] and "=" in parameters[0]:
-        for param in parameters:
-            paramSplitted = param.split("=")
-            parametersDict[paramSplitted[0]] = paramSplitted[1]
-        parameters = [parametersDict]            
 
     try:
         entrypoint = getattr(contract_interface, entrypointName)
-        if parameters == []:
-            op = entrypoint().with_amount(tezAmount * MUTEZ_CONV).send()
+        if parameters == [] or parameters is None:
+            op = entrypoint().with_amount(tezAmount).send()
+        elif isinstance(parameters, dict):
+            op = entrypoint(**parameters).with_amount(tezAmount).send()
+        elif isinstance(parameters, (list, tuple)):
+            op = entrypoint(*parameters).with_amount(tezAmount).send()
         else:
-            op = entrypoint(*parameters).with_amount(tezAmount * MUTEZ_CONV).send()
-        
+            op = entrypoint(parameters).with_amount(tezAmount).send()
+
         forged_op = op.forge()
-   
+
         op_hash = op.hash()
         print(f"Operation Send! Hash: {op_hash}")
-        
+
         start_time = time.time()
-        timeout = 500 
+        timeout = 500
         op_result = None
-        
-        # Attendi la conferma
+
         while time.time() - start_time < timeout:
             try:
                 op_result = client.shell.blocks[-10:].find_operation(op_hash)
-                print(f"   -> Operation Found")
-                break 
+                print("   -> Operation Found")
+                op_result["confirmed_level"] = getCurrentBlockLevel(client)
+                break
             except StopIteration:
                 print(f"   -> Not yet completed (time passed: {int(time.time() - start_time)}s)")
                 time.sleep(15)
@@ -190,82 +278,77 @@ def entrypointCall(client, contractAddress, entrypointName, parameters, tezAmoun
         if not op_result:
             print(f"\n❌ TIMEOUT: The operation has not be included after {timeout} seconds.")
             print("Operation could be failed or not choosen by bakers. (check fees)")
+            return None
 
         op_result["weight"] = len(forged_op) // 2
         return op_result
     except Exception as e:
         print(f"Si è verificato un errore: {e}")
+        return None
+
 
 def entrypointAnalyse(client, contractAddress):
     entrypointSchema = {}
-    
+
     try:
         contract = client.contract(contractAddress)
         if len(contract.entrypoints) > 1:
             del contract.entrypoints["default"]
-        
+
         for entrypoint_name, entrypoint_object in contract.entrypoints.items():
-            #print(f"📌 Entrypoint: \"{entrypoint_name}\"")
-    
             if hasattr(entrypoint_object, 'json_type'):
                 parameter_schema = entrypoint_object.json_type()
-                
+
                 if parameter_schema.get('title') == 'unit':
-                    #print("   Parameter: No required (type 'Unit').")
                     entrypointSchema[entrypoint_name] = "unit"
                 else:
-                    #print("   Parameter:")
                     lst = []
                     properties = parameter_schema.get('properties', {})
                     for param_name, param_details in properties.items():
                         param_type = param_details.get('title')
                         param_format = f" (details: {param_details.get('format', 'N/D')})"
-                        #print(f"     - name: `{param_name}`, Type: `{param_type}`{param_format}")
-                        entrypointSchema[entrypoint_name] = lst.append((param_name, (param_type, param_format)))
+                        lst.append((param_name, (param_type, param_format)))
+                    entrypointSchema[entrypoint_name] = lst
             else:
                 param_type = entrypoint_object.prim
-                #print("   Parameter required:")
-                #print(f"     - Name: `_` (parametro singolo), Type: `{param_type}`")
                 entrypointSchema[entrypoint_name] = param_type
-                    
+
         return entrypointSchema
 
     except Exception as e:
         print(f"An error occurred: {e}")
-        
+
+
 def callInfoResult(opResult):
-    #print("\n" + "="*20 + " COST ANALYZIS " + "="*20)
     callReport = {}
-    
+
+    if opResult is None:
+        raise ValueError("The operation result is empty because the entrypoint call failed.")
+
     try:
         callReport["Hash"] = opResult["hash"]
         content = opResult['contents'][0]
         metadata = content.get('metadata', {})
         op_result_info = metadata.get('operation_result', {})
-        
 
-        # BakerFee
         fee_mutez = int(content.get('fee', 0))
         callReport["BakerFee"] = fee_mutez
 
-        # Gas
         consumed_milligas = int(op_result_info.get('consumed_milligas', 0))
         callReport["Gas"] = consumed_milligas
 
-        # Storage Fee (Burn)
-        if ('paid_storage_size_diff' in op_result_info):
+        if 'paid_storage_size_diff' in op_result_info:
             storage_size_diff = int(op_result_info.get('paid_storage_size_diff', 0))
             storage_burn_cost_mutez = storage_size_diff * 250
             callReport["Storage"] = storage_burn_cost_mutez
         else:
             storage_burn_cost_mutez = 0
-            
-        
+
         total_cost_mutez = fee_mutez + storage_burn_cost_mutez
         callReport["TotalCost"] = total_cost_mutez
-        
+
         callReport["Weight"] = opResult["weight"]
-        
+
         return callReport
 
     except (KeyError, IndexError, TypeError) as e:

@@ -1,5 +1,8 @@
-import streamlit as st
+import json
 from pathlib import Path
+
+import streamlit as st
+from pytezos import pytezos
 
 from contractUtils import (
     compileContract,
@@ -8,13 +11,12 @@ from contractUtils import (
     entrypointAnalyse,
     entrypointCall,
     callInfoResult,
-    runScenario
+    runScenario,
+    getCompiledRoot
 )
 from folderScan import folderScan, contractSuites, scenarioScan
 from csvUtils import csvReader, csvWriter
-from jsonUtils import getAddress, addressUpdate, jsonWriter
-from pytezos import pytezos
-import json
+from jsonUtils import getAddress, addressUpdate, jsonWriter, jsonReader
 from main import executionSetupCsv, executionSetupJson
 
 st.set_page_config(
@@ -41,8 +43,23 @@ def get_contracts_root() -> Path:
     return candidates[0]
 
 
+def get_trace_root() -> Path:
+    candidates = [
+        TOOLCHAIN_ROOT / "rosetta_traces",
+        TOOLCHAIN_ROOT / "execution_traces",
+        Path("rosetta_traces"),
+        Path("execution_traces")
+    ]
+
+    for candidate in candidates:
+        if candidate.exists() and candidate.is_dir():
+            return candidate.resolve()
+
+    return candidates[0]
+
+
 def get_rosetta_scenarios_root() -> Path:
-    return get_contracts_root() / "Rosetta" / "scenarios"
+    return get_contracts_root() / "Rosetta"
 
 
 def get_client(wallet_id):
@@ -69,28 +86,60 @@ def parse_contract_id(contract_id: str) -> tuple[str, str]:
     return contract_id, contract_id
 
 
-def resolve_compiled_paths(folder: str, impl: str) -> tuple[Path, Path]:
-    folder_name = Path(folder).name
-    candidate_dirs = [
-        Path(f"./{impl}"),
-        Path(f"./{folder_name}"),
-        Path(f"./{folder}"),
-    ]
-    for base_dir in candidate_dirs:
-        c = base_dir / "step_001_cont_0_contract.tz"
-        s = base_dir / "step_001_cont_0_storage.tz"
-        if c.exists() and s.exists():
-            return c, s
-    return (
-        candidate_dirs[0] / "step_001_cont_0_contract.tz",
-        candidate_dirs[0] / "step_001_cont_0_storage.tz",
-    )
+def _resolve_compiled_artifact_dir(entry: Path) -> Path | None:
+    direct_contract = entry / "step_001_cont_0_contract.tz"
+    direct_storage = entry / "step_001_cont_0_storage.tz"
+    if direct_contract.exists() and direct_storage.exists():
+        return entry
 
+    matches = sorted(
+        path.parent
+        for path in entry.rglob("step_001_cont_0_contract.tz")
+        if path.parent.joinpath("step_001_cont_0_storage.tz").exists()
+    )
+    return matches[0] if matches else None
+
+
+def get_compiled_contracts() -> dict[str, dict]:
+    compiled_root = getCompiledRoot()
+    compiled_contracts = {}
+
+    if not compiled_root.exists():
+        return compiled_contracts
+
+    for entry in sorted(compiled_root.iterdir()):
+        if not entry.is_dir():
+            continue
+
+        artifact_dir = _resolve_compiled_artifact_dir(entry)
+        if artifact_dir is None:
+            continue
+
+        contract_path = artifact_dir / "step_001_cont_0_contract.tz"
+        storage_path = artifact_dir / "step_001_cont_0_storage.tz"
+        metadata_path = entry / "metadata.json"
+
+        metadata = {}
+        if metadata_path.exists():
+            try:
+                metadata = json.loads(metadata_path.read_text(encoding="utf-8"))
+            except Exception:
+                metadata = {}
+
+        display_name = metadata.get("contract_id") or metadata.get("contract_name") or entry.name
+        compiled_contracts[display_name] = {
+            "dir": artifact_dir,
+            "contract_path": contract_path,
+            "storage_path": storage_path,
+            "metadata": metadata,
+        }
+
+    return compiled_contracts
 
 def execution_setup_auto(contract: str, rows):
-    if isinstance(rows, dict):
-        return executionSetupCsv(contractId=contract, rows=rows)
-    return executionSetupJson(contractId=contract, rows=rows)
+    if isinstance(rows, dict) and "trace_execution" in rows:
+        return executionSetupJson(contractId=contract, traceData=rows)
+    return executionSetupCsv(contractId=contract, rows=rows)
 
 
 def compile_view(client):
@@ -128,7 +177,7 @@ def compile_view(client):
                 try:
                     compileContract(contractPath=str(contract_path))
                     st.success(f"Contract '{contract_to_compile}' compiled successfully!")
-                    st.info("The Michelson files have been generated in the contract's directory.")
+                    st.info(f"The Michelson files have been generated in `{getCompiledRoot()}`.")
                 except Exception as e:
                     st.error("Error during compilation")
                     st.code(str(e))
@@ -136,28 +185,15 @@ def compile_view(client):
 
 def deploy_view(client):
     st.header("2. Deploy a Contract (Origination)")
-    contracts_root = get_contracts_root()
-    suites = contractSuites(contracts_root)
+    compiled_contracts = get_compiled_contracts()
 
-    if not suites:
-        st.warning("No contract families found in the contracts directory.")
-        return
-
-    selected_suite = st.selectbox(
-        "Select a contract family:",
-        options=suites,
-        key="deploy_suite_select"
-    )
-
-    contracts = folderScan(contracts_root, suite=selected_suite)
-
-    if not contracts:
-        st.warning(f"No contracts found in '{selected_suite}'.")
+    if not compiled_contracts:
+        st.warning("No compiled contracts found in `toolchain/compiled`. Compile a contract before deploying.")
         return
 
     contract_to_deploy = st.selectbox(
-        "Select a contract to deploy:",
-        options=contracts,
+        "Select a compiled contract to deploy:",
+        options=list(compiled_contracts.keys()),
         key="deploy_select"
     )
 
@@ -165,12 +201,9 @@ def deploy_view(client):
 
     if st.button("🌐 Deploy"):
         if contract_to_deploy and client:
-            folder, impl = parse_contract_id(contract_to_deploy)
-            michelson_path, storage_path = resolve_compiled_paths(folder, impl)
-
-            if not michelson_path.exists() or not storage_path.exists():
-                st.error("Contract not compiled. Compile it before deploying.")
-                return
+            compiled_info = compiled_contracts[contract_to_deploy]
+            michelson_path = compiled_info["contract_path"]
+            storage_path = compiled_info["storage_path"]
 
             michelson_code = michelson_path.read_text()
             storage_code = storage_path.read_text()
@@ -252,32 +285,70 @@ def interact_view(client):
             st.error(f"Unable to analyze contract entrypoints: {e}")
 
 
+def load_json_traces():
+    return jsonReader(traceRoot=get_trace_root())
+
+
+def render_trace_execution(trace_name, trace_data):
+    with st.spinner(f"Executing trace '{trace_name}'..."):
+        results = execution_setup_auto(contract=trace_name, rows=trace_data)
+        for _, result in results.items():
+            exportResult(result)
+        return results
+
+
 def trace_view():
-    st.header("4. Execute Trace from CSV File")
-    st.info("This function executes a series of predefined transactions from the files in `execution_traces/`.")
+    st.header("4. Execute Trace")
+    trace_root = get_trace_root()
+    st.info(f"Trace source folder: `{trace_root}`")
 
-    if st.button("▶️ Start Trace Execution"):
-        try:
-            execution_traces = csvReader()
-            if not execution_traces:
-                st.warning("No execution traces found.")
-                return
+    execution_mode = st.radio(
+        "Select the execution mode:",
+        options=("Complete execution", "Single selection"),
+        key="trace_execution_mode"
+    )
 
-            with st.spinner("Executing traces..."):
+    try:
+        execution_traces = load_json_traces()
+    except Exception as e:
+        st.error(f"Error while loading traces: {e}")
+        return
+
+    if not execution_traces:
+        st.warning("No execution traces found.")
+        return
+
+    trace_names = list(execution_traces.keys())
+
+    if execution_mode == "Complete execution":
+        st.write("The following traces will be executed together:")
+        st.write(", ".join(trace_names))
+
+        if st.button("▶️ Execute all traces"):
+            try:
                 all_results = {}
-                for contract, rows in execution_traces.items():
-                    st.write(f"--- Executing trace for **{contract}** ---")
-                    results = execution_setup_auto(contract=contract, rows=rows)
-                    all_results[contract] = results
-                    for element, result in results.items():
-                        st.write(f"Step `{element}` completed.")
-                        exportResult(result)
+                for trace_name in trace_names:
+                    st.write(f"--- Executing trace **{trace_name}** ---")
+                    all_results[trace_name] = render_trace_execution(trace_name, execution_traces[trace_name])
 
-            st.success("All traces have been executed and the results saved.")
-            st.json(all_results)
+                st.success("All traces have been executed and the results saved.")
+                st.json(all_results)
+            except Exception as e:
+                st.error(f"Error during trace execution: {e}")
+    else:
+        selected_trace = st.selectbox(
+            "Select a trace to execute:",
+            options=trace_names,
+            key="single_trace_select"
+        )
 
-        except Exception as e:
-            st.error(f"Error during trace execution: {e}")
+        if st.button("▶️ Execute selected trace"):
+            try:
+                results = render_trace_execution(selected_trace, execution_traces[selected_trace])
+                st.success(f"Trace '{selected_trace}' executed successfully.")
+                st.json(results)
+            except Exception as e:
+                st.error(f"Error during trace execution: {e}")
 
 
 def scenario_view():
