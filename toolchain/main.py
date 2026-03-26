@@ -13,11 +13,14 @@ from contractUtils import (
     callInfoResult,
     runScenario,
     getCompiledRoot,
-    waitForBlockDelay
+    waitForBlockDelay,
+    getCurrentBlockLevel,
+    parseCompilationLog,
+    multiOrigination
 )
 from folderScan import folderScan, contractSuites, scenarioScan
 from csvUtils import csvReader, csvWriter
-from jsonUtils import getAddress, addressUpdate, jsonWriter, jsonReader, resolveAddress, normalizeTraceTitle, extractContractIdFromTraceTitle, updateDeploymentLevel, getDeploymentLevel
+from jsonUtils import getAddress, addressUpdate, jsonWriter, jsonReader, resolveAddress, normalizeTraceTitle, extractContractIdFromTraceTitle, updateDeploymentLevel, getDeploymentLevel, normalizeContractName
 
 
 def getToolchainRoot() -> Path:
@@ -77,7 +80,11 @@ def findCompiledArtifactDir(compiledBaseDir):
 
 
 def compiledOutputDir(contractFolder, fileBase):
-    normalized_name = fileBase.removesuffix("Rosetta")
+    parts = Path(contractFolder).parts
+    if len(parts) >= 2:
+        normalized_name = f"{parts[0]}_{parts[1]}_{fileBase}"
+    else:
+        normalized_name = f"{parts[0]}_{fileBase}"
     return str((getCompiledRoot() / normalized_name).resolve())
 
 
@@ -188,14 +195,19 @@ def extractWalletLabels(traceData):
             labels.append(actor_label)
             seen.add(actor_label)
 
-    for step in traceData.get("trace_execution", []):
+    sorted_steps = sorted(
+        traceData.get("trace_execution", []),
+        key=lambda step: sequenceSortKey(step.get("sequence_id", ""))
+    )
+
+    for step in sorted_steps:
         for actor in step.get("actors", []):
             actor_label = normalizeWalletLabel(actor)
             if actor_label and actor_label not in seen:
                 labels.append(actor_label)
                 seen.add(actor_label)
 
-        tezos_data = step.get("tezos", {})
+        tezos_data = getTezosStepConfig(step)
         provider_wallet = tezos_data.get("provider_wallet")
         if provider_wallet:
             provider_label = normalizeWalletLabel(provider_wallet)
@@ -205,6 +217,28 @@ def extractWalletLabels(traceData):
 
     return labels
 
+
+def getTezosStepConfig(step):
+    platform_specs = step.get("platform_specs", {})
+    tezos_data = platform_specs.get("tezos")
+
+    if isinstance(tezos_data, dict):
+        return tezos_data
+
+    legacy_tezos_data = step.get("tezos", {})
+    if isinstance(legacy_tezos_data, dict):
+        return legacy_tezos_data
+
+    return {}
+
+
+def sequenceSortKey(sequenceId):
+    text = str(sequenceId).strip()
+
+    try:
+        return (0, int(text))
+    except ValueError:
+        return (1, text)
 
 def buildWalletMap(traceData, availableWallets):
     normalized_wallets = {
@@ -289,6 +323,87 @@ def getEntrypointParameterNames(contractId, entrypointName):
     raise ValueError(f"Unable to resolve entrypoint '{entrypointName}' in '{sourcePath}'.")
 
 
+def getEntrypointParameterTypes(contractId, entrypointName):
+    """Return a dict {param_name: annotation_string} for the given entrypoint.
+    Only parameters with explicit type annotations are included."""
+    import ast
+
+    def annotation_to_str(node):
+        if isinstance(node, ast.Attribute):
+            return f"{annotation_to_str(node.value)}.{node.attr}"
+        if isinstance(node, ast.Name):
+            return node.id
+        if isinstance(node, ast.Subscript):
+            return annotation_to_str(node.value)
+        return ""
+
+    sourcePath = getContractSourcePath(contractId)
+    module = ast.parse(sourcePath.read_text(encoding="utf-8"))
+
+    for node in ast.walk(module):
+        if isinstance(node, ast.FunctionDef) and node.name == entrypointName:
+            decorators = []
+            for decorator in node.decorator_list:
+                if isinstance(decorator, ast.Attribute):
+                    decorators.append(decorator.attr)
+                elif isinstance(decorator, ast.Name):
+                    decorators.append(decorator.id)
+
+            if "entrypoint" in decorators:
+                result = {}
+                for arg in node.args.args:
+                    if arg.arg == "self":
+                        continue
+                    if arg.annotation is not None:
+                        result[arg.arg] = annotation_to_str(arg.annotation)
+                return result
+
+    return {}
+
+
+# SmartPy address types that must be passed as pytezos Key/Address objects
+_SP_ADDRESS_TYPES = {"sp.address", "sp.TAddress"}
+
+
+def coerceParameterForTezos(value, param_type_str):
+    """Convert a resolved parameter value to the format PyTezos expects.
+    Specifically, sp.address-annotated parameters must be passed as pytezos
+    Address objects, not plain strings, to ensure correct Michelson encoding."""
+    if param_type_str in _SP_ADDRESS_TYPES and isinstance(value, str):
+        from pytezos.crypto.encoding import is_address
+        if is_address(value):
+            return value  # PyTezos contract interface accepts plain tz1/KT1 strings
+    return value
+
+
+def resolveAddressOf(value):
+    """Recursively resolve {"address_of": "<label>"} objects to the corresponding
+    Tezos address read from pubKeyAddr.json.  Any other value is returned as-is."""
+    if isinstance(value, dict) and list(value.keys()) == ["address_of"]:
+        label = value["address_of"].strip().lower()
+        pub_key_path = getToolchainRoot() / "pubKeyAddr.json"
+        try:
+            with open(pub_key_path, "r", encoding="utf-8") as f:
+                pub_keys = json.load(f)
+        except FileNotFoundError:
+            raise FileNotFoundError(
+                f"pubKeyAddr.json not found at '{pub_key_path}'. "
+                "Create it with a mapping of label → Tezos address."
+            )
+        normalized = {k.strip().lower(): v for k, v in pub_keys.items()}
+        if label not in normalized:
+            raise KeyError(
+                f"'address_of' label '{label}' not found in pubKeyAddr.json. "
+                f"Available labels: {list(normalized.keys())}"
+            )
+        return normalized[label]
+    if isinstance(value, dict):
+        return {k: resolveAddressOf(v) for k, v in value.items()}
+    if isinstance(value, list):
+        return [resolveAddressOf(v) for v in value]
+    return value
+
+
 def buildStepParameters(contractId, entrypointName, stepArgs):
     filteredArgs = {
         key: value
@@ -296,10 +411,14 @@ def buildStepParameters(contractId, entrypointName, stepArgs):
         if not key.startswith("_")
     }
 
+    # Resolve any {"address_of": "<label>"} objects to real Tezos addresses.
+    filteredArgs = {k: resolveAddressOf(v) for k, v in filteredArgs.items()}
+
     if not filteredArgs:
         return []
 
     parameterNames = getEntrypointParameterNames(contractId, entrypointName)
+    parameterTypes = getEntrypointParameterTypes(contractId, entrypointName)
 
     if len(parameterNames) == 1:
         parameterName = parameterNames[0]
@@ -307,17 +426,21 @@ def buildStepParameters(contractId, entrypointName, stepArgs):
             raise KeyError(
                 f"Parameter '{parameterName}' not found in trace args for '{contractId}.{entrypointName}'."
             )
-        return filteredArgs[parameterName]
+        value = filteredArgs[parameterName]
+        return coerceParameterForTezos(value, parameterTypes.get(parameterName, ""))
 
     return {
-        parameterName: filteredArgs[parameterName]
+        parameterName: coerceParameterForTezos(
+            filteredArgs[parameterName],
+            parameterTypes.get(parameterName, "")
+        )
         for parameterName in parameterNames
         if parameterName in filteredArgs
     }
 
 
 def resolveStepWallet(step, walletMap):
-    tezos_data = step.get("tezos", {})
+    tezos_data = getTezosStepConfig(step)
     provider_wallet = tezos_data.get("provider_wallet")
     if provider_wallet:
         provider_label = normalizeWalletLabel(provider_wallet)
@@ -335,7 +458,6 @@ def resolveStepWallet(step, walletMap):
 
     raise ValueError("No wallet could be resolved for the trace step.")
 
-
 def normalizeJsonTrace(traceData):
     availableWallets = readWallets()
     walletMap = buildWalletMap(traceData, availableWallets)
@@ -345,21 +467,26 @@ def normalizeJsonTrace(traceData):
     if not traceContractId:
         raise ValueError("Unable to resolve the contract name from 'trace_title'.")
 
-    for step in traceData.get("trace_execution", []):
+    sorted_steps = sorted(
+        traceData.get("trace_execution", []),
+        key=lambda step: sequenceSortKey(step.get("sequence_id", ""))
+    )
+
+    for step in sorted_steps:
         args = step.get("args", {})
-        tezos_data = step.get("tezos", {})
+        tezos_data = getTezosStepConfig(step)
 
         normalizedRows[step["sequence_id"]] = {
             "entrypoint": step["function_name"],
             "wallet": resolveStepWallet(step, walletMap),
             "contractId": traceContractId,
             "parameters": buildStepParameters(traceContractId, step["function_name"], args),
-            "tezAmount": parseAmountToTez(tezos_data.get("_amount", args.get("_amount"))),
-            "waitingTime": int(step.get("waiting_time", 0) or 0)
+            "tezAmount": parseAmountToTez(step.get("value", tezos_data.get("value", tezos_data.get("_amount", args.get("_amount"))))),
+            "waitingTime": int(step.get("waiting_time", 0) or 0),
+            "valid": bool(step.get("valid", True))
         }
 
     return normalizedRows
-
 
 def executionSetupJson(contractId, traceData):
     normalizedRows = normalizeJsonTrace(traceData)
@@ -386,8 +513,11 @@ def executionSetupJson(contractId, traceData):
         key = wallet[walletSel]
         client = pytezos.using(shell="ghostnet", key=key)
 
-        if waitingTime > 0 and lastConfirmedBlockLevel is not None:
-            waitForBlockDelay(
+        if lastConfirmedBlockLevel is None:
+            lastConfirmedBlockLevel = getCurrentBlockLevel(client)
+
+        if waitingTime > 0:
+            lastConfirmedBlockLevel = waitForBlockDelay(
                 client=client,
                 startBlockLevel=lastConfirmedBlockLevel,
                 waitingTime=waitingTime
@@ -406,6 +536,8 @@ def executionSetupJson(contractId, traceData):
 
         if "confirmed_level" in opResult:
             lastConfirmedBlockLevel = opResult["confirmed_level"]
+        else:
+            lastConfirmedBlockLevel = getCurrentBlockLevel(client)
 
         infoResultDict[element] = infoResult
 
@@ -428,6 +560,177 @@ def scenarioSetup():
     scenarioSel = int(input("Which scenario do you want to test?\n"))
     scenarioPath = scenariosRoot / f"{scenarios[scenarioSel-1]}.py"
     return runScenario(str(scenarioPath))
+
+
+def normalizeContractToken(value):
+    return normalizeContractName(value).replace("/", "_").replace(":", "_").lower()
+
+
+def getCompiledContracts():
+    compiled_root = getCompiledRoot()
+    compiled_contracts = {}
+
+    if not compiled_root.exists():
+        return compiled_contracts
+
+    for entry in sorted(compiled_root.iterdir()):
+        if not entry.is_dir():
+            continue
+
+        artifact_dir = findCompiledArtifactDir(entry)
+        if artifact_dir is None:
+            continue
+
+        contract_path = artifact_dir / "step_001_cont_0_contract.tz"
+        storage_path = artifact_dir / "step_001_cont_0_storage.tz"
+        metadata_path = entry / "metadata.json"
+
+        metadata = {}
+        if metadata_path.exists():
+            try:
+                metadata = json.loads(metadata_path.read_text(encoding="utf-8"))
+            except Exception:
+                metadata = {}
+
+        display_name = metadata.get("contract_id") or metadata.get("contract_name") or entry.name
+        artifacts = parseCompilationLog(artifact_dir)
+        compiled_contracts[display_name] = {
+            "dir": artifact_dir,
+            "contract_path": contract_path,
+            "storage_path": storage_path,
+            "metadata": metadata,
+            "artifacts": artifacts,
+        }
+
+    return compiled_contracts
+
+
+def resolveCompiledContractInfo(contractId):
+    compiled_contracts = getCompiledContracts()
+
+    if contractId in compiled_contracts:
+        return compiled_contracts[contractId]
+
+    expected_token = normalizeContractToken(contractId)
+
+    for display_name, compiled_info in compiled_contracts.items():
+        metadata = compiled_info.get("metadata", {})
+        metadata_values = [
+            display_name,
+            metadata.get("contract_id", ""),
+            metadata.get("contract_name", ""),
+            Path(metadata.get("source", "")).stem,
+        ]
+
+        if any(normalizeContractToken(value) == expected_token for value in metadata_values if value):
+            return compiled_info
+
+    raise FileNotFoundError(f"No compiled artifacts found for '{contractId}'.")
+
+
+def resolveTraceContractCandidates(selectedContract, traceData):
+    trace_title_contract_id = extractContractIdFromTraceTitle(traceData.get("trace_title", ""))
+
+    candidate_ids = []
+    if trace_title_contract_id:
+        candidate_ids.append(trace_title_contract_id)
+
+    if selectedContract and selectedContract != "Ungrouped":
+        candidate_ids.append(selectedContract)
+
+    normalized_candidates = [normalizeContractToken(c) for c in candidate_ids if c]
+    contractsRoot = getContractsRoot()
+
+    if not contractsRoot.exists():
+        raise FileNotFoundError(f"Contracts folder not found: {contractsRoot}")
+
+    available_contracts = folderScan(contractsRoot)
+    resolved_candidates = {}
+
+    for contract_id in available_contracts:
+        folder, implementation = parseContractId(contract_id)
+        suite = folder.split("/", 1)[0]
+        searchable_tokens = {
+            normalizeContractToken(contract_id),
+            normalizeContractToken(folder),
+            normalizeContractToken(folder.split("/")[-1]),
+            normalizeContractToken(implementation),
+        }
+
+        if any(candidate in searchable_tokens for candidate in normalized_candidates):
+            resolved_candidates[suite] = contract_id
+
+    if resolved_candidates:
+        return resolved_candidates
+
+    raise FileNotFoundError(
+        "Unable to match the selected trace to a contract source file. "
+        f"Available contracts: {', '.join(available_contracts)}"
+    )
+
+
+def resolveTraceContractId(selectedContract, traceData, preferredSuite=None):
+    resolved_candidates = resolveTraceContractCandidates(
+        selectedContract=selectedContract, traceData=traceData
+    )
+
+    if preferredSuite and preferredSuite in resolved_candidates:
+        return resolved_candidates[preferredSuite]
+
+    if "Rosetta" in resolved_candidates:
+        return resolved_candidates["Rosetta"]
+
+    return next(iter(resolved_candidates.values()))
+
+
+def deployContract(client, contractId, initialBalance):
+    compiled_info = resolveCompiledContractInfo(contractId)
+    artifacts = compiled_info.get("artifacts", [])
+    artifact_dir = compiled_info["dir"]
+
+    if len(artifacts) > 1:
+        print(f"\n>>> Multi-contract detected ({len(artifacts)} artifacts):")
+        for art in artifacts:
+            print(f"    - {art['contract_name']} ({art['step_prefix']})")
+
+        return multiOrigination(
+            client=client,
+            artifactDir=str(artifact_dir),
+            contractId=contractId,
+            initialBalance=initialBalance,
+            normalizeContractNameFn=normalizeContractName,
+            addressUpdateFn=addressUpdate,
+            updateDeploymentLevelFn=updateDeploymentLevel
+        )
+    else:
+        michelson_code = compiled_info["contract_path"].read_text(encoding="utf-8")
+        storage_code = compiled_info["storage_path"].read_text(encoding="utf-8")
+
+        op_result = origination(client, michelson_code, storage_code, initialBalance)
+        if not op_result:
+            raise RuntimeError(f"Origination failed for '{contractId}'.")
+
+        contractInfo = contractInfoResult(op_result)
+        addressUpdate(contract=contractId, newAddress=contractInfo["address"])
+        if "ConfirmedLevel" in contractInfo:
+            updateDeploymentLevel(contract=contractId, confirmedLevel=contractInfo["ConfirmedLevel"])
+
+        return [{"artifact": None, "info": contractInfo, "addressName": contractId}]
+
+
+def compileAndDeployForTrace(client, selectedContract, traceData, shouldCompile, initialBalance, preferredSuite=None):
+    contractId = resolveTraceContractId(selectedContract, traceData, preferredSuite)
+
+    if shouldCompile:
+        folder, implementation = parseContractId(contractId)
+        contractPath = getContractsRoot() / folder / f"{implementation}.py"
+        if not contractPath.exists():
+            raise FileNotFoundError(f"Contract source not found: {contractPath}")
+        compileContract(str(contractPath))
+
+    results = deployContract(client, contractId, initialBalance)
+    main_result = results[-1]
+    return contractId, main_result["info"]
 
 
 def exportResult(opResult):
@@ -483,24 +786,15 @@ def main():
             main()
 
         case 2:
-            out_dir = Path(compiledOutputDir(contractFolder=contractFolder, fileBase=fileBase))
-            artifact_dir = findCompiledArtifactDir(out_dir) if out_dir.exists() else None
-            if artifact_dir is not None:
-                michelsonPath = (artifact_dir / "step_001_cont_0_contract.tz").read_text()
-                storagePath = (artifact_dir / "step_001_cont_0_storage.tz").read_text()
-                initialBalance = int(input("Insert an initial balance:"))
-                op_result = origination(
-                    client=client,
-                    michelsonCode=michelsonPath,
-                    initialStorage=storagePath,
-                    initialBalance=initialBalance
-                )
-                contractInfo = contractInfoResult(op_result=op_result)
-                addressUpdate(contract=contractId, newAddress=contractInfo["address"])
-                if "ConfirmedLevel" in contractInfo:
-                    updateDeploymentLevel(contract=contractId, confirmedLevel=contractInfo["ConfirmedLevel"])
-            else:
+            initialBalance = int(input("Insert an initial balance: "))
+            try:
+                results = deployContract(client=client, contractId=contractId, initialBalance=initialBalance)
+                for r in results:
+                    print(f"  -> {r['addressName']}: {r['info']['address']}")
+            except FileNotFoundError:
                 print("\n\033[1m Contract must be compiled before \033[0m\n\n")
+            except Exception as e:
+                print(f"\nERROR during deploy: {e}\n")
 
             main()
 

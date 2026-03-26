@@ -75,6 +75,9 @@ def resolveAddress(addressValid, contractId):
             normalizeContractName(folder)
         ])
 
+    normalized = normalizeContractName(contractId)
+    resolutionCandidates.append(f"{normalized}_{normalized}")
+
     for candidate in resolutionCandidates:
         if candidate in addressValid:
             return addressValid[candidate]
@@ -128,20 +131,61 @@ def jsonReader(traceRoot=None):
 
     try:
         executionTraces = sorted(
-            entry.name
-            for entry in trace_root.iterdir()
-            if entry.is_file() and entry.suffix == ".json" and not entry.name.startswith('.')
+            entry
+            for entry in trace_root.rglob("*.json")
+            if entry.is_file() and not entry.name.startswith('.')
         )
 
-        for trace in executionTraces:
-            fileName = trace_root / trace
-            with open(fileName, 'r', encoding='utf-8') as file:
+        for tracePath in executionTraces:
+            with open(tracePath, 'r', encoding='utf-8') as file:
                 traceData = json.load(file)
 
-            traceTitle = traceData.get("trace_title", trace.replace(".json", ""))
+            traceTitle = traceData.get("trace_title", tracePath.stem)
             executionTracesDict[normalizeTraceTitle(traceTitle)] = traceData
 
         return executionTracesDict
+
+    except FileNotFoundError:
+        print(f"Error: Folder '{trace_root}' not found.")
+    except Exception as e:
+        print(f"Error: {e}")
+
+
+
+def jsonReaderByContract(traceRoot=None):
+    trace_root = Path(traceRoot) if traceRoot else getTraceRoot()
+    executionTracesByContract = {}
+    excluded_contracts = {"traces_guide"}
+
+    try:
+        traceFiles = sorted(
+            entry
+            for entry in trace_root.rglob("*.json")
+            if entry.is_file() and not entry.name.startswith('.')
+        )
+
+        for tracePath in traceFiles:
+            relativePath = tracePath.relative_to(trace_root)
+            contractName = relativePath.parts[0] if len(relativePath.parts) > 1 else "Ungrouped"
+
+            if contractName in excluded_contracts:
+                continue
+
+            with open(tracePath, 'r', encoding='utf-8') as file:
+                traceData = json.load(file)
+
+            traceTitle = traceData.get("trace_title", tracePath.stem)
+            normalizedTraceName = normalizeTraceTitle(traceTitle)
+
+            if contractName not in executionTracesByContract:
+                executionTracesByContract[contractName] = {}
+
+            executionTracesByContract[contractName][normalizedTraceName] = traceData
+
+        return {
+            contractName: dict(sorted(contractTraces.items()))
+            for contractName, contractTraces in sorted(executionTracesByContract.items())
+        }
 
     except FileNotFoundError:
         print(f"Error: Folder '{trace_root}' not found.")

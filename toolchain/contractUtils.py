@@ -13,9 +13,10 @@ MUTEZ_CONV = 1000000
 
 
 def _normalize_compiled_name(contract_path: Path) -> str:
-    name = contract_path.stem
-    name = re.sub(r"Rosetta$", "", name)
-    return name
+    suite = contract_path.parent.parent.name
+    family = contract_path.parent.name
+    implementation = contract_path.stem
+    return f"{suite}_{family}_{implementation}"
 
 
 def getCompiledRoot() -> Path:
@@ -96,8 +97,11 @@ def compileContract(contractPath):
             capture_output=True,
             text=True
         )
-        if result.stdout:
-            print(result.stdout)
+
+        # Print subprocess output so redirect_stdout in the dapp captures it.
+        subprocess_output = "\n".join(filter(None, [result.stdout, result.stderr])).strip()
+        if subprocess_output:
+            print(subprocess_output)
 
         nested_dirs = sorted(
             path for path in output_dir.iterdir()
@@ -117,15 +121,97 @@ def compileContract(contractPath):
         return result
 
     except subprocess.CalledProcessError as e:
-        if e.stdout:
-            print(e.stdout)
-        if e.stderr:
-            print(e.stderr)
+        # Always print both streams so the dapp terminal buffer captures them
+        # before the exception interrupts the flow.
+        subprocess_output = "\n".join(filter(None, [e.stdout, e.stderr])).strip()
+        if subprocess_output:
+            print(subprocess_output)
 
-        details = (e.stderr or e.stdout or "").strip()
-        if details:
-            raise RuntimeError(f"Compilation failed for '{contract_path}':\n{details}") from e
-        raise RuntimeError(f"Compilation failed for '{contract_path}'.") from e
+        details = subprocess_output or f"Exit code {e.returncode}"
+        raise RuntimeError(f"Compilation failed for '{contract_path}':\n{details}") from e
+
+
+def parseCompilationLog(artifactDir):
+    logPath = Path(artifactDir) / "log.txt"
+    if not logPath.exists():
+        return []
+
+    log = logPath.read_text(encoding="utf-8")
+    artifacts = []
+
+    creating_pattern = re.compile(r'Creating contract (KT1\w+)')
+    contract_file_pattern = re.compile(
+        r'file \S+/(step_(\d+)_cont_(\d+))_contract\.tz contract (\w+)'
+    )
+
+    placeholders = creating_pattern.findall(log)
+    contract_files = contract_file_pattern.findall(log)
+
+    for i, (step_prefix, step_num, cont_num, contract_name) in enumerate(contract_files):
+        placeholder = placeholders[i] if i < len(placeholders) else None
+        artifacts.append({
+            "step_prefix": step_prefix,
+            "step_num": int(step_num),
+            "cont_num": int(cont_num),
+            "contract_name": contract_name,
+            "placeholder": placeholder
+        })
+
+    return sorted(artifacts, key=lambda a: (a["step_num"], a["cont_num"]))
+
+
+def multiOrigination(client, artifactDir, contractId, initialBalance, normalizeContractNameFn, addressUpdateFn, updateDeploymentLevelFn):
+    artifactDir = Path(artifactDir)
+    artifacts = parseCompilationLog(artifactDir)
+
+    if not artifacts:
+        raise FileNotFoundError(f"No artifacts found in '{artifactDir}' (missing or empty log.txt).")
+
+    baseName = normalizeContractNameFn(contractId)
+    deployedAddresses = {}
+    results = []
+
+    for artifact in artifacts:
+        prefix = artifact["step_prefix"]
+        contractTzPath = artifactDir / f"{prefix}_contract.tz"
+        storageTzPath = artifactDir / f"{prefix}_storage.tz"
+
+        if not contractTzPath.exists() or not storageTzPath.exists():
+            raise FileNotFoundError(f"Missing compiled files for {prefix} in '{artifactDir}'.")
+
+        contractTz = contractTzPath.read_text(encoding="utf-8")
+        storageTz = storageTzPath.read_text(encoding="utf-8")
+
+        for placeholder, realAddress in deployedAddresses.items():
+            storageTz = storageTz.replace(placeholder, realAddress)
+
+        artifactName = re.sub(r"Rosetta$", "", artifact["contract_name"])
+        displayName = f"{baseName}_{artifactName}"
+
+        print(f"\n>>> Deploying '{displayName}' ({artifact['contract_name']})...")
+        op_result = origination(client, contractTz, storageTz, initialBalance)
+
+        if op_result is None:
+            raise RuntimeError(f"Deploy failed for '{displayName}'.")
+
+        contractInfo = contractInfoResult(op_result)
+
+        if artifact["placeholder"]:
+            deployedAddresses[artifact["placeholder"]] = contractInfo["address"]
+
+        addressUpdateFn(contract=displayName, newAddress=contractInfo["address"])
+
+        if "ConfirmedLevel" in contractInfo:
+            updateDeploymentLevelFn(contract=displayName, confirmedLevel=contractInfo["ConfirmedLevel"])
+
+        print(f">>> '{displayName}' deployed at {contractInfo['address']}")
+        results.append({
+            "artifact": artifact,
+            "info": contractInfo,
+            "addressName": displayName
+        })
+
+    return results
 
 
 def runScenario(scenarioPath):
@@ -283,8 +369,8 @@ def entrypointCall(client, contractAddress, entrypointName, parameters, tezAmoun
         op_result["weight"] = len(forged_op) // 2
         return op_result
     except Exception as e:
-        print(f"Si è verificato un errore: {e}")
-        return None
+        print(traceback.format_exc())
+        raise RuntimeError(f"Entrypoint call '{entrypointName}' failed: {e}") from e
 
 
 def entrypointAnalyse(client, contractAddress):
