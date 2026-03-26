@@ -1,4 +1,5 @@
 import smartpy as sp
+import requests
 
 @sp.module
 def main():
@@ -30,8 +31,13 @@ def main():
 @sp.add_test()
 def test():
     sc = sp.test_scenario("VestingRosetta", main)
-    beneficiary = sp.test_account("beneficiary")
-    start_level = sp.nat(5)
-    duration = sp.nat(10)
-    vesting = main.VestingRosetta(beneficiary.address, start_level, duration)
+    beneficiary = sp.address("tz1SL2xBdmLSD2W3Hs84SfH912xDpYtAjsaa")
+    start_level = sp.nat(0)
+    duration = sp.nat(30)
+    
+    rpc = "https://rpc.tzkt.io/ghostnet"
+    head = requests.get(f"{rpc}/chains/main/blocks/head/header").json()
+    current_level = int(head["level"])
+    
+    vesting = main.VestingRosetta(beneficiary, start_level + current_level, duration)
     sc += vesting

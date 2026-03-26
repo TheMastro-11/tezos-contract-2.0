@@ -1,5 +1,5 @@
 {
-  "trace_title": "Auction",
+  "trace_title": "Lottery__player1_wins",
   "trace_actors": [
     "player1",
     "player2"
@@ -8,16 +8,8 @@
     "solana": {
       "use": "True"
     },
-    "ethereum": {
-      "network": "localhost",
-      "use": "True",
-      "deploy_config": {
-        "settings": {
-          "sender_wallet": "seller"
-        },
-        "_object": "monitor",
-        "_startingBid": "1"
-      }
+    "evm": {
+      "use": "True"
     },
     "tezos": {
       "use": "True"
@@ -29,17 +21,17 @@
   "trace_execution": [
     {
       "sequence_id": "1",
-      "function_name": "start",
+      "function_name": "join0",
       "waiting_time": 0,
       "actors": [
         "player1"
       ],
       "args": {
-        "duration": 30
+        "h": "0x18e89aad9c08c17eb79083b022fbdb658e73898a8d75a7b6fefaafc5c9813e84"
       },
-      "value": 0.0,
+      "value": 0.001,
       "valid": true,
-      "platform_specs" : {
+      "platform_specs": {
         "tezos": {},
         "cardano": {},
         "ethereum": {},
@@ -48,15 +40,17 @@
     },
     {
       "sequence_id": "2",
-      "function_name": "bid",
+      "function_name": "join1",
       "waiting_time": 0,
       "actors": [
         "player2"
       ],
-      "args": {},
-      "value": 2.0,
+      "args": {
+        "h": "0x7afc6f3b4b0d11a32eaf5196d892cf4003624aa8e2f7ee33ca9088fa21206b54"
+      },
+      "value": 0.001,
       "valid": true,
-      "platform_specs" : {
+      "platform_specs": {
         "tezos": {},
         "cardano": {},
         "ethereum": {},
@@ -65,15 +59,17 @@
     },
     {
       "sequence_id": "3",
-      "function_name": "withdraw",
+      "function_name": "reveal0",
       "waiting_time": 0,
       "actors": [
-        "player2"
+        "player1"
       ],
-      "args": {},
+      "args": {
+        "s": "alpha"
+      },
       "value": 0.0,
       "valid": true,
-      "platform_specs" : {
+      "platform_specs": {
         "tezos": {},
         "cardano": {},
         "ethereum": {},
@@ -82,15 +78,34 @@
     },
     {
       "sequence_id": "4",
-      "function_name": "end",
-      "waiting_time": 50,
+      "function_name": "reveal1",
+      "waiting_time": 0,
       "actors": [
-        "player1"
+        "player2"
+      ],
+      "args": {
+        "s": "beta"
+      },
+      "value": 0.0,
+      "valid": true,
+      "platform_specs": {
+        "tezos": {},
+        "cardano": {},
+        "ethereum": {},
+        "solana": {}
+      }
+    },
+    {
+      "sequence_id": "5",
+      "function_name": "win",
+      "waiting_time": 0,
+      "actors": [
+        "player2"
       ],
       "args": {},
       "value": 0.0,
       "valid": true,
-      "platform_specs" : {
+      "platform_specs": {
         "tezos": {},
         "cardano": {},
         "ethereum": {},

@@ -1,4 +1,5 @@
 import smartpy as sp
+import requests
 
 @sp.module
 def main():
@@ -20,16 +21,21 @@ def main():
 
         @sp.entrypoint
         def timeout(self):
-            assert sp.level >= self.data.reveal_timeout
-            sp.send(self.data.owner, sp.balance)
+            assert sp.level >= self.data.reveal_timeout, "Timeout not reached"
+            sp.send(self.data.verifier, sp.balance)
 
 @sp.add_test()
 def test():
     sc = sp.test_scenario("HTLCRosetta", main)
-    owner = sp.test_account("owner")
-    verifier = sp.test_account("verifier")
+    owner = sp.address("tz1SL2xBdmLSD2W3Hs84SfH912xDpYtAjsaa")
+    verifier = sp.address("tz1aLPm3WynyHRXFvjjdHZDKEjHZVvQMGxqU")
     secret = "Test"
     secret_hash = sp.keccak(sp.pack(secret))
-    delay = sp.nat(10)
-    empty_htlc = main.HTLCRosetta(owner.address, verifier.address, secret_hash, delay)
+    delay = sp.nat(30)
+    
+    rpc = "https://rpc.tzkt.io/ghostnet"
+    head = requests.get(f"{rpc}/chains/main/blocks/head/header").json()
+    current_level = int(head["level"])
+    
+    empty_htlc = main.HTLCRosetta(owner, verifier, secret_hash, delay + current_level)
     sc += empty_htlc

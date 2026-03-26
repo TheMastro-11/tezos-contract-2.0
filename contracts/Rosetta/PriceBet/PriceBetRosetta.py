@@ -1,4 +1,5 @@
 import smartpy as sp
+import requests
 
 @sp.module
 def main():
@@ -41,5 +42,23 @@ def main():
 @sp.add_test()
 def test():
     sc = sp.test_scenario("PriceBetRosetta", main)
-    oracle_win = main.Oracle()
-    sc += oracle_win
+
+    owner = sp.address("tz1SL2xBdmLSD2W3Hs84SfH912xDpYtAjsaa")
+    initial_pot = sp.mutez(1000)
+    deadline = sp.nat(30)
+
+    rpc = "https://rpc.tzkt.io/ghostnet"
+    head = requests.get(f"{rpc}/chains/main/blocks/head/header").json()
+    current_level = int(head["level"])
+    
+    oracle = main.Oracle()
+    sc += oracle
+
+    winning_bet = main.PriceBetRosetta(
+        owner=owner,
+        initial_pot=initial_pot,
+        oracle=oracle.address,
+        deadline=deadline + current_level,
+        exchange_rate=sp.nat(10),
+    )
+    sc += winning_bet

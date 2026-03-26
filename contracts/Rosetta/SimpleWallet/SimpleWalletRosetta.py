@@ -53,7 +53,7 @@ def main():
 
 @sp.add_test()
 def test():
-    sc = sp.test_scenario("SimpleWalletRosetta", [t,main])
-    owner = sp.test_account("owner")
-    wallet = main.SimpleWalletRosetta(owner.address)
+    sc = sp.test_scenario("SimpleWalletRosetta")
+    owner = sp.address("tz1SL2xBdmLSD2W3Hs84SfH912xDpYtAjsaa")
+    wallet = main.SimpleWalletRosetta(owner)
     sc += wallet

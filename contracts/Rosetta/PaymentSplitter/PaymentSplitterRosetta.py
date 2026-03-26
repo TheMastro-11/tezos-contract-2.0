@@ -71,18 +71,25 @@ def main():
 
         @sp.offchain_view()
         def releasable(self, account: sp.address):
-            total_received = sp.balance + self.data.total_released
-            return (utils.mutez_to_nat(total_received) * self.data.shares[account]) / self.data.total_shares - utils.mutez_to_nat(self.data.total_released)
+            total_received = utils.mutez_to_nat(sp.balance + self.data.total_released)
+            already_released = utils.mutez_to_nat(
+                self.data.released.get(account, default=sp.mutez(0))
+            )
+            due = sp.fst(sp.ediv(total_received * self.data.shares[account], self.data.total_shares).unwrap_some())
+            return sp.as_nat(due - already_released)
         
         @sp.entrypoint
         def release(self, account: sp.address):
-            assert self.data.shares[account] > sp.nat(0), "PaymentSplitter: account has no shares"
+            assert self.data.shares.contains(account) and self.data.shares[account] > sp.nat(0), "PaymentSplitter: account has no shares"
             total_received = utils.mutez_to_nat(sp.balance + self.data.total_released)
-            num = total_received * self.data.shares[account]
-            div = self.data.total_shares - utils.mutez_to_nat(self.data.total_released)
-            payment = sp.fst(sp.ediv(num, sp.as_nat(div)).unwrap_some())
+            already_released = utils.mutez_to_nat(
+                self.data.released.get(account, default=sp.mutez(0))
+            )
+            due = sp.fst(sp.ediv(total_received * self.data.shares[account], self.data.total_shares).unwrap_some())
+            payment = sp.as_nat(due - already_released)
             assert payment != 0, "PaymentSplitter: account is not due payment"
             
+            self.data.released[account] = self.data.released.get(account, default=sp.mutez(0)) + utils.nat_to_mutez(payment)
             self.data.total_released += utils.nat_to_mutez(payment)
             
             sp.send(account, utils.nat_to_mutez(payment))
@@ -90,18 +97,15 @@ def main():
 @sp.add_test()
 def test():
     sc = sp.test_scenario("PaymentSplitterRosetta", main)
-    admin = sp.test_account("admin")
-    mario = sp.test_account("mario")
-    luca = sp.test_account("luca")
+    admin = sp.address("tz1SL2xBdmLSD2W3Hs84SfH912xDpYtAjsaa")
+    mario = sp.address("tz1aLPm3WynyHRXFvjjdHZDKEjHZVvQMGxqU")
     payees = [
-        admin.address,
-        mario.address,
-        luca.address,
+        admin,
+        mario
     ]
     shares = [
-        sp.nat(50),
-        sp.nat(30),
-        sp.nat(20),
+        sp.nat(70),
+        sp.nat(30)
     ]
     payment_splitter = main.PaymentSplitterRosetta(shares, payees)
     sc += payment_splitter

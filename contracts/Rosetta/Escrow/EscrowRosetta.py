@@ -40,8 +40,8 @@ def main():
 @sp.add_test()
 def test():
     sc = sp.test_scenario("EscrowRosetta")
-    seller = sp.test_account("seller")
-    buyer = sp.test_account("buyer")
+    seller = sp.address("tz1SL2xBdmLSD2W3Hs84SfH912xDpYtAjsaa")
+    buyer = sp.address("tz1aLPm3WynyHRXFvjjdHZDKEjHZVvQMGxqU")
     amount = sp.mutez(1000)
-    escrow_pay = main.EscrowRosetta(amount, buyer.address, seller.address)
+    escrow_pay = main.EscrowRosetta(amount, buyer, seller)
     sc += escrow_pay

@@ -1,5 +1,5 @@
 {
-  "trace_title": "Auction",
+  "trace_title": "Crowdfund",
   "trace_actors": [
     "player1",
     "player2"
@@ -8,16 +8,8 @@
     "solana": {
       "use": "True"
     },
-    "ethereum": {
-      "network": "localhost",
-      "use": "True",
-      "deploy_config": {
-        "settings": {
-          "sender_wallet": "seller"
-        },
-        "_object": "monitor",
-        "_startingBid": "1"
-      }
+    "evm": {
+      "use": "True"
     },
     "tezos": {
       "use": "True"
@@ -29,17 +21,15 @@
   "trace_execution": [
     {
       "sequence_id": "1",
-      "function_name": "start",
+      "function_name": "donate",
       "waiting_time": 0,
       "actors": [
         "player1"
       ],
-      "args": {
-        "duration": 30
-      },
-      "value": 0.0,
+      "args": {},
+      "value": 0.000050,
       "valid": true,
-      "platform_specs" : {
+      "platform_specs": {
         "tezos": {},
         "cardano": {},
         "ethereum": {},
@@ -48,15 +38,15 @@
     },
     {
       "sequence_id": "2",
-      "function_name": "bid",
+      "function_name": "donate",
       "waiting_time": 0,
       "actors": [
         "player2"
       ],
       "args": {},
-      "value": 2.0,
+      "value": 0.000050,
       "valid": true,
-      "platform_specs" : {
+      "platform_specs": {
         "tezos": {},
         "cardano": {},
         "ethereum": {},
@@ -66,31 +56,14 @@
     {
       "sequence_id": "3",
       "function_name": "withdraw",
-      "waiting_time": 0,
-      "actors": [
-        "player2"
-      ],
-      "args": {},
-      "value": 0.0,
-      "valid": true,
-      "platform_specs" : {
-        "tezos": {},
-        "cardano": {},
-        "ethereum": {},
-        "solana": {}
-      }
-    },
-    {
-      "sequence_id": "4",
-      "function_name": "end",
-      "waiting_time": 50,
+      "waiting_time": 30,
       "actors": [
         "player1"
       ],
       "args": {},
       "value": 0.0,
       "valid": true,
-      "platform_specs" : {
+      "platform_specs": {
         "tezos": {},
         "cardano": {},
         "ethereum": {},

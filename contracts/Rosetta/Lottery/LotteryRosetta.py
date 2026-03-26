@@ -22,8 +22,8 @@ def main():
             self.data.secret0 = ""
             self.data.secret1 = ""
             self.data.bet_amount = sp.mutez(0)
-            self.data.end_join = sp.level + sp.nat(1000)
-            self.data.end_reveal = sp.level + sp.nat(1000)
+            self.data.end_join = sp.level + sp.nat(30)
+            self.data.end_reveal = sp.level + sp.nat(30)
             self.data.status = sp.cast(sp.variant.Join0(), status)
             
         @sp.entrypoint
@@ -99,6 +99,6 @@ def main():
 @sp.add_test()
 def test():
     sc = sp.test_scenario("LotteryRosetta", main)
-    owner = sp.test_account("owner")
-    lottery = main.LotteryRosetta(owner.address)
+    owner = sp.address("tz1SL2xBdmLSD2W3Hs84SfH912xDpYtAjsaa")
+    lottery = main.LotteryRosetta(owner)
     sc += lottery

@@ -22,7 +22,7 @@ def main():
 @sp.add_test()
 def test():
     sc = sp.test_scenario("SimpleTransferRosetta", main)
-    owner = sp.test_account("owner")
-    recipient = sp.test_account("recipient")
-    sitr = main.SimpleTransferRosetta(owner.address, recipient.address)
+    owner = sp.address("tz1SL2xBdmLSD2W3Hs84SfH912xDpYtAjsaa")
+    recipient = sp.address("tz1aLPm3WynyHRXFvjjdHZDKEjHZVvQMGxqU")
+    sitr = main.SimpleTransferRosetta(owner, recipient)
     sc += sitr

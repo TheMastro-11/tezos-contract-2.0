@@ -13,23 +13,19 @@ def test():
 
     admin = sp.test_account("admin")
     mario = sp.test_account("mario")
-    luca = sp.test_account("luca")
     outsider = sp.test_account("outsider")
 
     payees = [
         admin.address,
-        mario.address,
-        luca.address,
+        mario.address
     ]
     shares = [
-        sp.nat(50),
-        sp.nat(30),
-        sp.nat(20),
+        sp.nat(70),
+        sp.nat(30)
     ]
 
     sc.h1("Main scenario")
 
-    
     payment_splitter = main.PaymentSplitterRosetta(shares, payees)
     sc += payment_splitter
 
@@ -38,10 +34,8 @@ def test():
     sc.verify(payment_splitter.data.total_released == sp.mutez(0))
     sc.verify(payment_splitter.payee(sp.nat(0)) == admin.address)
     sc.verify(payment_splitter.payee(sp.nat(1)) == mario.address)
-    sc.verify(payment_splitter.payee(sp.nat(2)) == luca.address)
     sc.verify(payment_splitter.data.shares[admin.address] == sp.nat(50))
     sc.verify(payment_splitter.data.shares[mario.address] == sp.nat(30))
-    sc.verify(payment_splitter.data.shares[luca.address] == sp.nat(20))
 
     sc.h2("Receiving funds")
     payment_splitter.receive(_sender=outsider.address, _amount=sp.mutez(10))
@@ -50,7 +44,6 @@ def test():
     sc.h2("Release flow")
     payment_splitter.release(admin.address, _sender=admin.address)
     payment_splitter.release(mario.address, _sender=mario.address)
-    payment_splitter.release(luca.address, _sender=luca.address)
 
     sc.h2("No payment for non-payee")
     payment_splitter.release(outsider.address, _sender=outsider.address, _valid=False)

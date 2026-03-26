@@ -50,8 +50,8 @@ def main():
 @sp.add_test()
 def test():
     sc = sp.test_scenario("VaultRosetta", main)
-    owner = sp.test_account("owner")
-    recovery = sp.test_account("recovery")
-    wait_time = sp.nat(10)
-    vault = main.VaultRosetta(owner.address, recovery.address, wait_time)
+    owner = sp.address("tz1SL2xBdmLSD2W3Hs84SfH912xDpYtAjsaa")
+    recovery = sp.address( "tz1aLPm3WynyHRXFvjjdHZDKEjHZVvQMGxqU")
+    wait_time = sp.nat(30)
+    vault = main.VaultRosetta(owner, recovery, wait_time)
     sc += vault
